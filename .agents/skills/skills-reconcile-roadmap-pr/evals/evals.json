@@ -1,0 +1,61 @@
+{
+	"skill_name": "skills-reconcile-roadmap-pr",
+	"evals": [
+		{
+			"id": 1,
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr 次のPRを進めて` was explicitly invoked in a clean repository. The next item is unambiguous, source code/tests/docs agree, the estimate is 320 implementation lines, and all applicable checks pass. Explain the actions and final state without modifying files, Git, or GitHub.",
+			"expected_output": "The agent describes the complete green path for exactly one item, ending with a verified regular pull request and no merge.",
+			"files": [],
+			"expectations": [
+				"It starts from the latest successful main and does not stack the change.",
+				"It investigates source and destination and states scope, exclusions, acceptance, files, size, and verification before implementation.",
+				"It proceeds through implementation, checks, commit, push, and regular PR creation without asking a routine approval question.",
+				"It verifies isDraft is false and never merges the pull request."
+			]
+		},
+		{
+			"id": 2,
+			"prompt": "Hypothetical dry run only: while advancing one roadmap item, the pinned source implementation accepts an input that its tests reject and its README documents differently. Explain the response without modifying files, Git, or GitHub.",
+			"expected_output": "The agent stops before commit, push, or PR creation and asks for a decision using concrete evidence and options.",
+			"files": [],
+			"expectations": [
+				"It does not choose one source interpretation by assumption.",
+				"It reports a minimal reproduction, observed source behavior, competing expectations, impacts, split feasibility, and a recommendation.",
+				"It leaves the behavior unpublished until the user decides."
+			]
+		},
+		{
+			"id": 3,
+			"prompt": "Hypothetical dry run only: a targeted test fails because an in-scope Go identifier was misspelled. The established source contract is otherwise consistent and the fix adds no scope. Explain the response without modifying files, Git, or GitHub.",
+			"expected_output": "The agent treats the failure as routine, fixes it, reruns the affected and required checks, and continues the green path.",
+			"files": [],
+			"expectations": [
+				"It does not ask the user to decide a routine implementation correction.",
+				"It reruns verification after the correction.",
+				"It still enforces every publication gate before creating a regular PR."
+			]
+		},
+		{
+			"id": 4,
+			"prompt": "Hypothetical dry run only: the final merge-base diff for one roadmap item contains 512 changed non-test implementation lines, although tests pass. Explain the response without modifying files, Git, or GitHub.",
+			"expected_output": "The agent stops publication, reports the hard-gate evidence, and proposes a behavior-preserving split without separating implementation from its tests.",
+			"files": [],
+			"expectations": [
+				"It does not commit, push, or create a pull request with a 512-line non-test implementation diff.",
+				"It does not waive the 500-line gate because tests pass.",
+				"It asks for a split decision with a recommended boundary."
+			]
+		},
+		{
+			"id": 5,
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr P02を調査だけして。変更やPR作成はしないで` was explicitly invoked. Explain the actions and final state without modifying files, Git, or GitHub.",
+			"expected_output": "The agent honors the narrower request, performs read-only investigation, reports the working contract and any decisions, and makes no branch, file, commit, push, or PR change.",
+			"files": [],
+			"expectations": [
+				"It does not treat explicit invocation as permission to exceed the user's narrower scope.",
+				"It reports scope, exclusions, acceptance, expected files, estimated size, and verification.",
+				"It performs no publication action."
+			]
+		}
+	]
+}
