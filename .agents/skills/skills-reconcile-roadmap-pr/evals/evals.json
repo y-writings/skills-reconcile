@@ -54,6 +54,7 @@
 			"expectations": [
 				"It does not treat explicit invocation as permission to exceed the user's narrower scope.",
 				"It reports scope, exclusions, acceptance, expected files, estimated size, and verification.",
+				"It does not fetch or update Git refs; any remote-state check is read-only and reports that the local base was not refreshed.",
 				"It performs no publication action."
 			]
 		}

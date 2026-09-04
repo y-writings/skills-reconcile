@@ -48,7 +48,9 @@ user-specific configuration into the destination.
    worktree status, remotes, and recent history.
 2. Preserve unrelated user changes. Do not stash, reset, discard, or incorporate them. Stop if they
    prevent an isolated change.
-3. Fetch the remote and confirm the local base equals the latest successful `main`.
+3. For a full workflow, fetch the remote and confirm the local base equals the latest successful
+   `main`. For an investigation-only request, do not fetch or update Git refs; use read-only remote
+   or GitHub API queries when freshness is needed, and report that the local base was not refreshed.
 4. Confirm the preceding roadmap item is merged and there is no open feature pull request on which
    this item would depend.
 5. Identify exactly one roadmap item. Stop if repository history and the roadmap do not identify one
