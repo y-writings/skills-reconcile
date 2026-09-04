@@ -99,10 +99,10 @@ remote entry に必要な検証がすべて有効になっていることを確�
 | W11 | install 前の projection intent を記録する  | crash recovery、状態更新、失敗注入                  | 300–450 | 外部 process より前に再実行可能な所有権 intent が残る                 |
 | W12 | remote/workspace 遷移を検証する            | 再観測、provenance 確認、projection 除去            | 300–450 | remote の新しい所有権を確認する前に workspace 記録を捨てない          |
 | W13 | workspace 削除後の状態を検証する           | prune 後の再観測、state cleanup                     | 300–450 | install が残る場合や対象が変わった場合は ownership を保持する         |
-| W14 | workspace 対応 `apply` を公開する          | global lock、phase 結合、CLI test                   | 280–450 | 途中失敗から再実行でき、同じ workspace の再実行が収束する             |
-| W15 | `doctor` と `plan` を workspace 対応にする | 警告、未登録 directory、JSON 出力                   | 220–400 | schema v2 の remote/workspace 混在 fixture を読み取り専用で診断できる |
+| W14 | `doctor` と `plan` を workspace 対応にする | 警告、未登録 directory、JSON 出力                   | 220–400 | schema v2 の remote/workspace 混在 fixture を読み取り専用で診断できる |
+| W15 | workspace 対応 `apply` を公開する          | global lock、phase 結合、CLI test                   | 280–450 | 途中失敗から再実行でき、同じ workspace の再実行が収束する             |
 
-W01 から W04 は、移行元の大きな `internal/workspace` を安全に分割するため別 PR とする。W14 が
+W01 から W04 は、移行元の大きな `internal/workspace` を安全に分割するため別 PR とする。W15 が
 終わるまでは、workspace entry を含む `apply` を明示的に拒否する。
 
 ## フェーズ 7: adopt
