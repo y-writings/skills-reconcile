@@ -1,0 +1,9 @@
+**
+!Dockerfile
+!go.mod
+!cmd/
+!cmd/**
+!tools/
+!tools/skills/
+!tools/skills/package.json
+!tools/skills/package-lock.json
