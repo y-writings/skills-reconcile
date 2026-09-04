@@ -13,6 +13,10 @@
 
 - Migrate only the Skill management tool. Never copy or commit Skill bodies, a real
   `skills-manifest.json`, machine state, credentials, or user-specific paths and configuration.
+- The prohibition on committing Skill bodies applies to Skills from `.worktrees/skills` and real
+  managed Skills. Repository-local Skills under `.agents/skills/**` may be committed when they only
+  provide development or migration guidance for `skills-reconcile` and contain none of that
+  prohibited source or user data.
 - Move one reviewable behavior and its tests at a time. Unsupported inputs and flags must fail
   explicitly instead of being ignored.
 - Do not mix bug fixes, specification changes, general refactoring, or unrelated dependency updates
