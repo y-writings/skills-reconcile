@@ -1,0 +1,6 @@
+interface:
+  display_name: "Skills Reconcile Roadmap PR"
+  short_description: "Advance one migration item through a verified regular PR"
+  default_prompt: "$skills-reconcile-roadmap-pr Advance exactly one skills-reconcile roadmap item through a verified regular pull request."
+policy:
+  allow_implicit_invocation: false
