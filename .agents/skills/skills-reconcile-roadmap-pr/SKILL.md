@@ -141,7 +141,9 @@ provide one of the planned check paths, record that fact accurately rather than 
 
 ## Publish the green path
 
-Only after every applicable local check passes and no material decision remains:
+Only enter this publication sequence when every applicable local check passes, no material decision
+remains, and the invocation either retains the default full green path or explicitly requests
+publication:
 
 1. create a focused semantic commit;
 2. push the non-stacked branch;
@@ -151,12 +153,19 @@ Only after every applicable local check passes and no material decision remains:
 5. create a regular pull request without a draft flag; and
 6. query the created pull request and confirm its base, head, URL, body, and `isDraft: false`.
 
+If the invocation excludes publication, do not push the branch or create or edit a pull request.
+Honor any separate instruction about a local commit; otherwise leave the verified diff in the worktree.
+Report the branch, worktree and commit state, diff summary, checks run, and the next action that would
+require authorization.
+
 If CI or review later exposes a routine in-scope defect, fix it on the same branch and reverify. If it
 exposes a material decision, leave the regular pull request open, do not merge it, and present the
 same evidence and options required by the stop gate.
 
 ## Report the result
 
-On success, report the pull request URL, branch and commit, selected roadmap item, changed files,
-actual line-count categories, checks run, and deliberately deferred scope. On a stop path, report
-what remains unchanged or unpublished and the exact user decision needed to continue.
+On published success, report the pull request URL, branch and commit, selected roadmap item, changed
+files, actual line-count categories, checks run, and deliberately deferred scope. On local-only
+success, report the local state defined above and confirm which publication actions were skipped. On
+a stop path, report what remains unchanged or unpublished and the exact user decision needed to
+continue.

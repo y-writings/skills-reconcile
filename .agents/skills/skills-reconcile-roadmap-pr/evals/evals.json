@@ -69,6 +69,17 @@
 				"It runs only the named verification and reports its result.",
 				"It performs no implementation or publication action."
 			]
+		},
+		{
+			"id": 7,
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr P02を実装して。commit、push、PR作成はしないで` was explicitly invoked. Explain the actions and final state without modifying files, Git, or GitHub.",
+			"expected_output": "The agent implements and verifies P02 on an isolated branch but stops before commit, push, or PR creation and reports the resulting local state.",
+			"files": [],
+			"expectations": [
+				"It performs the implementation and applicable verification within the requested scope.",
+				"It does not commit, push, create a pull request, or edit an existing pull request.",
+				"It reports the branch, worktree status, diff summary, verification results, and next action requiring authorization."
+			]
 		}
 	]
 }
