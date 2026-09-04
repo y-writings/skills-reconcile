@@ -55,6 +55,7 @@
 				"It does not treat explicit invocation as permission to exceed the user's narrower scope.",
 				"It reports scope, exclusions, acceptance, expected files, estimated size, and verification.",
 				"It does not fetch or update Git refs; any remote-state check is read-only and reports that the local base was not refreshed.",
+				"It stops before implementation and does not run the implementation verification suite.",
 				"It performs no publication action."
 			]
 		},
@@ -66,6 +67,7 @@
 			"expectations": [
 				"It verifies the current checkout instead of selecting main as a new base.",
 				"It does not fetch, update Git refs, switch branches, or create a branch.",
+				"It does not load the migration source or establish a roadmap implementation contract.",
 				"It runs only the named verification and reports its result.",
 				"It performs no implementation or publication action."
 			]

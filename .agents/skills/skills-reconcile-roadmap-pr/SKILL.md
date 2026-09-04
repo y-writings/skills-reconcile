@@ -9,7 +9,7 @@ description: Advance exactly one skills-reconcile migration roadmap item from pr
 
 ## Outcome
 
-Advance exactly one item from `docs/plan/pr-roadmap.md` on top of the latest successful `main`.
+Start work on exactly one item in `docs/plan/pr-roadmap.md` from the latest successful `main`.
 On the green path, investigate the source and destination, implement and verify the item, commit and
 push the branch, and create a regular pull request. Never merge the pull request.
 
@@ -18,20 +18,22 @@ push the branch, and create a regular pull request. Never merge the pull request
 - Run this workflow only after explicit invocation. `agents/openai.yaml` disables implicit use.
 - Treat an item ID named by the user as the target. Otherwise determine the single next item from
   roadmap order, repository state, and merged pull requests.
-- Unless the user limits the task, explicit invocation authorizes the complete green path through a
-  regular pull request. Do not pause for routine implementation choices that the existing contract
-  already resolves.
-- Honor narrower requests such as investigation only, implementation without publication, or a
-  named verification step.
-- For an investigation-only request, keep preflight read-only and do not create a branch.
-- For a verification-only request, preserve the current checkout and run only the named check. Do
-  not fetch, update Git refs, select `main` as a base, switch branches, create a branch, or start
-  implementation.
+- Choose the requested endpoint before entering the roadmap workflow:
+  - a named verification runs only that check on the current checkout;
+  - investigation stops after establishing and reporting the working contract;
+  - a verified local change stops after implementation and verification; and
+  - a regular pull request is the default when the user does not set an earlier endpoint.
+- Do not proceed beyond the chosen endpoint. Explicit invocation authorizes the complete green path
+  only when the user has not limited it, and routine implementation choices already follow from the
+  established contract.
 - Never merge, enable auto-merge, publish a release, or run the migrated CLI against real data.
+
+For a named verification, preserve the current checkout and Git refs, run only the named check,
+report its result, and stop without entering the roadmap workflow below.
 
 ## Load the source of truth
 
-Before changing files, read:
+Before continuing with the roadmap workflow, read:
 
 1. the repository-root `AGENTS.md`;
 2. `docs/plan/README.md`;
@@ -59,12 +61,8 @@ user-specific configuration into the destination.
    history and the roadmap do not identify one unambiguous next item.
 6. When implementing an item, create a new, non-stacked branch from that base.
 
-For an investigation-only request, do not fetch or update Git refs; use read-only remote or GitHub
+For an investigation endpoint, do not fetch or update Git refs; use read-only remote or GitHub
 API queries when freshness is needed, and report that the local base was not refreshed.
-
-If `main` advances before publication, rebase onto the new latest successful `main` and rerun all
-verification when the rebase is conflict-free. Stop and report evidence if it conflicts or changes
-the selected item's contract.
 
 ## Establish the contract before implementation
 
@@ -91,7 +89,7 @@ Stop before commit, push, or pull request creation when any of these conditions 
 - behavior appears defective or requires a bug fix, specification change, general refactor, or
   unrelated dependency update;
 - more than one roadmap item is needed for a buildable or testable change;
-- non-test implementation is estimated above 450 changed lines or actually exceeds 500;
+- non-test implementation is estimated or actually measured above 500 changed lines;
 - total hand-written implementation, tests, and fixtures exceeds 1,000 changed lines without a
   reviewed split decision;
 - real HOME, XDG state, installed Skills, manifests, credentials, Docker socket, or other real user
@@ -109,6 +107,9 @@ answer.
 Routine formatting, compilation, lint, or test failures caused by an in-scope mistake are not
 material decisions. Fix them, rerun the affected checks, and continue. Retry a transient command
 failure when doing so cannot change the contract or touch real data.
+
+At an investigation endpoint, report the working contract, findings, and any decision needed, then
+stop before implementation. Do not create a branch or change files, commits, or pull requests.
 
 ## Implement one item
 
@@ -139,11 +140,15 @@ Run the checks required by the selected phase and the repository's current tooli
 Never substitute a host-side write test for the required container boundary. If a phase does not yet
 provide one of the planned check paths, record that fact accurately rather than inventing a command.
 
+At a verified local change endpoint, honor an explicitly requested local commit only after the
+checks pass; otherwise leave the verified diff in the worktree. Report the branch, worktree and
+commit state, diff summary, checks run, and the next action that would require authorization, then
+stop before publication.
+
 ## Publish the green path
 
-Only enter this publication sequence when every applicable local check passes, no material decision
-remains, and the invocation either retains the default full green path or explicitly requests
-publication:
+Only the regular pull request endpoint enters this sequence. Proceed when every applicable local
+check passes and no material decision remains:
 
 1. create a focused semantic commit;
 2. push the non-stacked branch;
@@ -153,19 +158,14 @@ publication:
 5. create a regular pull request without a draft flag; and
 6. query the created pull request and confirm its base, head, URL, body, and `isDraft: false`.
 
-If the invocation excludes publication, do not push the branch or create or edit a pull request.
-Honor any separate instruction about a local commit; otherwise leave the verified diff in the worktree.
-Report the branch, worktree and commit state, diff summary, checks run, and the next action that would
-require authorization.
-
 If CI or review later exposes a routine in-scope defect, fix it on the same branch and reverify. If it
 exposes a material decision, leave the regular pull request open, do not merge it, and present the
 same evidence and options required by the stop gate.
 
 ## Report the result
 
-On published success, report the pull request URL, branch and commit, selected roadmap item, changed
-files, actual line-count categories, checks run, and deliberately deferred scope. On local-only
-success, report the local state defined above and confirm which publication actions were skipped. On
-a stop path, report what remains unchanged or unpublished and the exact user decision needed to
-continue.
+Use the endpoint-specific reports above for named verification, investigation, and verified local
+changes. On published success, report the pull request URL, branch and commit, selected roadmap item,
+changed files, actual line-count categories, checks run, and deliberately deferred scope. On a
+material stop path, report what remains unchanged or unpublished and the exact user decision needed
+to continue.
