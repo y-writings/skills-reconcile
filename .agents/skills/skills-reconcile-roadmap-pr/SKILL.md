@@ -22,8 +22,11 @@ push the branch, and create a regular pull request. Never merge the pull request
   regular pull request. Do not pause for routine implementation choices that the existing contract
   already resolves.
 - Honor narrower requests such as investigation only, implementation without publication, or a
-  named verification step. For an investigation-only request, keep preflight read-only and do not
-  create a branch.
+  named verification step.
+- For an investigation-only request, keep preflight read-only and do not create a branch.
+- For a verification-only request, preserve the current checkout and run only the named check. Do
+  not fetch, update Git refs, select `main` as a base, switch branches, create a branch, or start
+  implementation.
 - Never merge, enable auto-merge, publish a release, or run the migrated CLI against real data.
 
 ## Load the source of truth
@@ -48,14 +51,16 @@ user-specific configuration into the destination.
    worktree status, remotes, and recent history.
 2. Preserve unrelated user changes. Do not stash, reset, discard, or incorporate them. Stop if they
    prevent an isolated change.
-3. For a full workflow, fetch the remote and confirm the local base equals the latest successful
-   `main`. For an investigation-only request, do not fetch or update Git refs; use read-only remote
-   or GitHub API queries when freshness is needed, and report that the local base was not refreshed.
-4. Confirm the preceding roadmap item is merged and there is no open feature pull request on which
-   this item would depend.
-5. Identify exactly one roadmap item. Stop if repository history and the roadmap do not identify one
-   unambiguous next item.
-6. Create a new, non-stacked branch from that base.
+3. When implementing an item, fetch the remote and confirm the local base equals the latest
+   successful `main`.
+4. When implementing or investigating an item, confirm the preceding roadmap item is merged and
+   there is no open feature pull request on which this item would depend.
+5. When implementing or investigating an item, identify exactly one roadmap item. Stop if repository
+   history and the roadmap do not identify one unambiguous next item.
+6. When implementing an item, create a new, non-stacked branch from that base.
+
+For an investigation-only request, do not fetch or update Git refs; use read-only remote or GitHub
+API queries when freshness is needed, and report that the local base was not refreshed.
 
 If `main` advances before publication, rebase onto the new latest successful `main` and rerun all
 verification when the rebase is conflict-free. Stop and report evidence if it conflicts or changes
