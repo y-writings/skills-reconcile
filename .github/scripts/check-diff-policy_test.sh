@@ -114,6 +114,34 @@ test_skill_helper_limit() {
   expect_failure "handwritten implementation exceeds 500 changed lines"
 }
 
+test_documentation_implementation_limit() {
+  local path
+  for path in \
+    docs/install.sh \
+    docs/tool \
+    .agents/skills/example/references/install.sh; do
+    new_repo
+    mkdir -p "$repo/$(dirname "$path")"
+    awk 'BEGIN { for (i = 1; i <= 501; i++) print "line" i }' >"$repo/$path"
+    if [[ "$path" == docs/tool ]]; then
+      chmod +x "$repo/$path"
+    fi
+    commit_changes
+    expect_failure "handwritten implementation exceeds 500 changed lines"
+  done
+
+  new_repo
+  path=docs/tool
+  mkdir -p "$repo/$(dirname "$path")"
+  awk 'BEGIN { for (i = 1; i <= 501; i++) print "line" i }' >"$repo/$path"
+  chmod +x "$repo/$path"
+  commit_changes
+  base=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" rm --quiet -- "$path"
+  commit_changes
+  expect_failure "handwritten implementation exceeds 500 changed lines"
+}
+
 test_forbidden_paths() {
   local path
   for path in \
@@ -157,12 +185,15 @@ test_binary_rejection() {
 
 test_sensitive_content() {
   local kind
-  for kind in private-key unix-user-path root-home-path unterminated-home-path windows-user-path access-token credential-url diff-header-user-path diff-header-token; do
+  for kind in private-key unix-user-path unicode-unix-user-path unicode-macos-user-path root-home-path quoted-root-home-path unterminated-home-path windows-user-path access-token credential-url diff-header-user-path diff-header-token; do
     new_repo
     case "$kind" in
       private-key) printf '%s%s\n' '-----BEGIN ' 'PRIVATE KEY-----' >"$repo/leak.txt" ;;
       unix-user-path) printf '/%s/%s/private\n' Users demo >"$repo/leak.txt" ;;
+      unicode-unix-user-path) printf '/%s/%s/private\n' home 日本語 >"$repo/leak.txt" ;;
+      unicode-macos-user-path) printf '/%s/%s/private\n' Users 日本語 >"$repo/leak.txt" ;;
       root-home-path) printf '/%s/.agents/private\n' root >"$repo/leak.txt" ;;
+      quoted-root-home-path) printf 'HOME="/%s"\n' root >"$repo/leak.txt" ;;
       unterminated-home-path) printf 'HOME=/%s/%s\n' home demo >"$repo/leak.txt" ;;
       windows-user-path) printf '%s:\\%s\\%s\\private\n' C Users demo >"$repo/leak.txt" ;;
       access-token) printf '%s%s\n' ghp_ aaaaaaaaaaaaaaaaaaaa >"$repo/leak.txt" ;;
@@ -180,6 +211,7 @@ test_implementation_limit
 test_handwritten_warning
 test_unverified_generated_limit
 test_skill_helper_limit
+test_documentation_implementation_limit
 test_forbidden_paths
 test_synthetic_state_fixture
 test_binary_rejection

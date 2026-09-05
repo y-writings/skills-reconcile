@@ -17,6 +17,12 @@ git rev-parse --verify "${base}^{commit}" >/dev/null 2>&1 || fail "invalid base 
 git rev-parse --verify "${head}^{commit}" >/dev/null 2>&1 || fail "invalid head revision"
 merge_base=$(git merge-base "$base" "$head") || fail "base and head have no merge base"
 
+is_executable_at() {
+  local revision=$1
+  local path=$2
+  [[ $(git ls-tree --format='%(objectmode)' "$revision" -- ":(literal)$path") == 100755 ]]
+}
+
 implementation_lines=0
 test_lines=0
 fixture_lines=0
@@ -48,11 +54,21 @@ while IFS= read -r -d '' record; do
       generated_lines=$((generated_lines + changed_lines))
       implementation_lines=$((implementation_lines + changed_lines))
       ;;
-    docs/* | README.md | README.* | AGENTS.md | .agents/skills/*/SKILL.md | .agents/skills/*/README.md | .agents/skills/*/references/* | .agents/skills/*/agents/*.md)
-      documentation_lines=$((documentation_lines + changed_lines))
-      ;;
     *)
-      implementation_lines=$((implementation_lines + changed_lines))
+      if [[ "$changed_path" == *.sh ]] ||
+        is_executable_at "$merge_base" "$changed_path" ||
+        is_executable_at "$head" "$changed_path"; then
+        implementation_lines=$((implementation_lines + changed_lines))
+      else
+        case "$changed_path" in
+          docs/* | README.md | README.* | AGENTS.md | .agents/skills/*/SKILL.md | .agents/skills/*/README.md | .agents/skills/*/references/* | .agents/skills/*/agents/*.md)
+            documentation_lines=$((documentation_lines + changed_lines))
+            ;;
+          *)
+            implementation_lines=$((implementation_lines + changed_lines))
+            ;;
+        esac
+      fi
       ;;
   esac
 done < <(git diff --numstat -z --find-renames=100% "$merge_base" "$head" --)
@@ -105,7 +121,9 @@ while IFS= read -r -d '' changed_path; do
   esac
 done < <(git diff --name-only -z --no-renames --diff-filter=ACMRTUXB "$merge_base" "$head" --)
 
-sensitive_pattern='-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY-----|https?://[^[:space:]/:@]+:[^[:space:]@]+@|/(Users|home)/[A-Za-z0-9._-]+|/root(/|[[:space:]]|$)|[A-Za-z]:\\Users\\[^\\[:space:]]+|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|sk-[A-Za-z0-9]{20,}'
+# Keep this fragment split so the policy does not flag its own source.
+root_home_pattern='/ro''ot([^[:alnum:]_.-]|$)'
+sensitive_pattern='-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY-----|https?://[^[:space:]/:@]+:[^[:space:]@]+@|/(Users|home)/[^/[:space:]]+|'"$root_home_pattern"'|[A-Za-z]:\\Users\\[^\\[:space:]]+|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|sk-[A-Za-z0-9]{20,}'
 if git diff --no-ext-diff --unified=0 "$merge_base" "$head" -- |
   awk '
     /^diff --git / { in_hunk = 0; next }
