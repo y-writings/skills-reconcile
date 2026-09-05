@@ -3,3 +3,7 @@
 .gh
 .opencode/plugins/entire.ts
 # end driftline
+
+/skills-reconcile
+/state/
+/tools/skills/node_modules/

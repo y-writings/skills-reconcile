@@ -1,0 +1,11 @@
+**
+!go.mod
+!go.sum
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+!tools/
+!tools/skills/
+!tools/skills/package.json
+!tools/skills/package-lock.json

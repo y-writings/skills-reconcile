@@ -1,2 +1,10 @@
 # This TOML file contains project-specific settings.
 # Add project-specific information here.
+
+[tasks."container:build"]
+description = "Build the pinned development toolchain image"
+run = "docker build --target development --tag skills-reconcile-dev:local ."
+
+[tasks."container:test"]
+description = "Build and test in the pinned toolchain image"
+run = "docker build --target test --tag skills-reconcile-test:local ."
