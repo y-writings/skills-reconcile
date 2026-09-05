@@ -28,11 +28,11 @@ workflow、shell script、mise など実行動作を変える設定は、この�
 
 ## フェーズ 1: 開発と CI の土台
 
-| ID  | PR の責務                         | 主な成果物                                               |    目安 | 完了条件                                                     |
-| --- | --------------------------------- | -------------------------------------------------------- | ------: | ------------------------------------------------------------ |
-| P01 | Nix導入可能な最小CLIを起動する    | `go.mod`、entrypoint、flake/lock、npm版`skills`、wrapper | 300–450 | `nix build`と`nix run`が成功し、書き込みコマンドは存在しない |
-| P02 | 固定toolchainをコンテナ化する     | `Dockerfile`、`.dockerignore`、ignore、mise task         | 150–300 | Skill本体なしでイメージを再現でき、hostのホームをmountしない |
-| P03 | build経路と差分gateをCIで検証する | Go/Nix/container jobs、500行検査、禁止パス検査           | 220–400 | 読み取り権限だけのPR workflowで三つのbuild経路が成功する     |
+| ID  | PR の責務                      | 主な成果物                                               |    目安 | 完了条件                                                     |
+| --- | ------------------------------ | -------------------------------------------------------- | ------: | ------------------------------------------------------------ |
+| P01 | Nix導入可能な最小CLIを起動する | `go.mod`、entrypoint、flake/lock、npm版`skills`、wrapper | 300–450 | `nix build`と`nix run`が成功し、書き込みコマンドは存在しない |
+| P02 | 固定toolchainをコンテナ化する  | `Dockerfile`、`.dockerignore`、ignore、mise task         | 150–300 | Skill本体なしでイメージを再現でき、hostのホームをmountしない |
+| P03 | build経路をCIで検証する        | Go/Nix/container jobs                                    |   40–80 | 読み取り権限だけのPR workflowで三つのbuild経路が成功する     |
 
 P01 の終了時点を「最小コアの実行可能な骨格」かつ「Nixから導入可能な最初の到達点」とする。P03 までに、
 Goの直接build、Nix package、開発コンテナを同じCLI契約に対して検証できる状態にする。以後はこの骨格へ

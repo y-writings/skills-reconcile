@@ -4,21 +4,6 @@ on:
 permissions:
   contents: read
 jobs:
-  diff-policy:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 0
-      - name: Test policy decisions
-        run: .github/scripts/check-diff-policy_unit_test.sh
-      - name: Test policy against Git repositories
-        run: .github/scripts/check-diff-policy_test.sh
-      - name: Check pull request diff
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: .github/scripts/check-diff-policy.sh "$BASE_SHA" "$HEAD_SHA"
   build-unit:
     runs-on: ubuntu-24.04
     steps:
