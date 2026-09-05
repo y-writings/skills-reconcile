@@ -15,7 +15,6 @@ ENV GOTOOLCHAIN=local
 ENV SKILLS_RECONCILE_EXECUTABLE=/opt/skills/node_modules/.bin/skills
 
 WORKDIR /workspace
-CMD ["bash"]
 
 FROM toolchain AS test
 
@@ -25,10 +24,7 @@ COPY cmd ./cmd
 RUN test "$(go env GOVERSION)" = "go1.24.0" \
     && test "$(node --version)" = "v22.20.0" \
     && skills_version="$($SKILLS_RECONCILE_EXECUTABLE --version)" \
-    && case "$skills_version" in \
-        1.5.23|"skills 1.5.23"|v1.5.23) ;; \
-        *) echo "unexpected skills version: $skills_version" >&2; exit 1 ;; \
-    esac
+    && test "$skills_version" = "1.5.23"
 RUN unformatted="$(gofmt -l ./cmd)" \
     && test -z "$unformatted"
 RUN go test ./... \
@@ -37,3 +33,5 @@ RUN go test ./... \
     && skills-reconcile --help >/dev/null
 
 FROM toolchain AS development
+
+CMD ["bash"]
