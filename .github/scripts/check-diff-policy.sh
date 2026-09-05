@@ -41,14 +41,14 @@ while IFS= read -r -d '' record; do
     testdata/* | */testdata/*)
       fixture_lines=$((fixture_lines + changed_lines))
       ;;
-    *_test.go | *_test.sh | tests/* | */tests/*)
+    *_test.go | *_test.sh | tests/* | */tests/* | .agents/skills/*/evals/*)
       test_lines=$((test_lines + changed_lines))
       ;;
     flake.lock | go.sum | tools/skills/package-lock.json)
       generated_lines=$((generated_lines + changed_lines))
       implementation_lines=$((implementation_lines + changed_lines))
       ;;
-    docs/* | README.md | README.* | AGENTS.md | .agents/skills/*)
+    docs/* | README.md | README.* | AGENTS.md | .agents/skills/*/SKILL.md | .agents/skills/*/README.md | .agents/skills/*/references/* | .agents/skills/*/agents/*.md)
       documentation_lines=$((documentation_lines + changed_lines))
       ;;
     *)
@@ -107,7 +107,11 @@ done < <(git diff --name-only -z --no-renames --diff-filter=ACMRTUXB "$merge_bas
 
 sensitive_pattern='-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY-----|https?://[^[:space:]/:@]+:[^[:space:]@]+@|/(Users|home)/[A-Za-z0-9._-]+|/root(/|[[:space:]]|$)|[A-Za-z]:\\Users\\[^\\[:space:]]+|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|sk-[A-Za-z0-9]{20,}'
 if git diff --no-ext-diff --unified=0 "$merge_base" "$head" -- |
-  awk '/^\+\+\+ / { next } /^\+/ { sub(/^\+/, ""); print }' |
+  awk '
+    /^diff --git / { in_hunk = 0; next }
+    /^@@ / { in_hunk = 1; next }
+    in_hunk && /^\+/ { sub(/^\+/, ""); print }
+  ' |
   LC_ALL=C grep -E -e "$sensitive_pattern" >/dev/null; then
   fail "added content contains a credential or machine-specific path"
 fi

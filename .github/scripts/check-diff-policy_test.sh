@@ -43,7 +43,13 @@ expect_failure() {
 
 test_line_categories() {
   new_repo
-  mkdir -p "$repo/cmd/app" "$repo/internal/example/testdata" "$repo/docs"
+  mkdir -p \
+    "$repo/cmd/app" \
+    "$repo/internal/example/testdata" \
+    "$repo/docs" \
+    "$repo/.agents/skills/example/agents" \
+    "$repo/.agents/skills/example/evals" \
+    "$repo/.agents/skills/example/references"
   local unicode_doc=$'docs/日本語\tline\nbreak.md'
   printf 'change\n' >>"$repo/main.go"
   printf 'package app\n' >"$repo/cmd/app/main_test.go"
@@ -51,6 +57,11 @@ test_line_categories() {
   printf '{}\n' >"$repo/flake.lock"
   printf 'note\n' >"$repo/docs/note.md"
   printf 'unicode note\n' >"$repo/$unicode_doc"
+  printf 'skill guide\n' >"$repo/.agents/skills/example/SKILL.md"
+  printf 'agent guide\n' >"$repo/.agents/skills/example/agents/guide.md"
+  printf 'trigger config\n' >"$repo/.agents/skills/example/agents/openai.yaml"
+  printf 'eval\n' >"$repo/.agents/skills/example/evals/evals.json"
+  printf 'reference\n' >"$repo/.agents/skills/example/references/note.md"
   printf 'rename\n' >"$repo/old.txt"
   git -C "$repo" add old.txt
   git -C "$repo" commit --quiet -m rename-base
@@ -59,13 +70,13 @@ test_line_categories() {
   commit_changes
 
   output=$(cd "$repo" && "$policy_script" "$base" HEAD 2>&1)
-  assert_contains "$output" "Handwritten implementation: 2"
-  assert_contains "$output" "Tests: 1"
+  assert_contains "$output" "Handwritten implementation: 3"
+  assert_contains "$output" "Tests: 2"
   assert_contains "$output" "Handwritten fixtures: 1"
   assert_contains "$output" "Generated files counted as implementation: 1"
-  assert_contains "$output" "Documentation: 2"
+  assert_contains "$output" "Documentation: 5"
   assert_contains "$output" "Pure renames: 1 files"
-  assert_contains "$output" "Handwritten total: 4"
+  assert_contains "$output" "Handwritten total: 6"
 }
 
 test_implementation_limit() {
@@ -92,6 +103,15 @@ test_unverified_generated_limit() {
     commit_changes
     expect_failure "handwritten implementation exceeds 500 changed lines"
   done
+}
+
+test_skill_helper_limit() {
+  new_repo
+  local helper_path=.agents/skills/example/scripts/install.sh
+  mkdir -p "$repo/$(dirname "$helper_path")"
+  awk 'BEGIN { for (i = 1; i <= 501; i++) print "line" i }' >"$repo/$helper_path"
+  commit_changes
+  expect_failure "handwritten implementation exceeds 500 changed lines"
 }
 
 test_forbidden_paths() {
@@ -137,7 +157,7 @@ test_binary_rejection() {
 
 test_sensitive_content() {
   local kind
-  for kind in private-key unix-user-path root-home-path unterminated-home-path windows-user-path access-token credential-url; do
+  for kind in private-key unix-user-path root-home-path unterminated-home-path windows-user-path access-token credential-url diff-header-user-path diff-header-token; do
     new_repo
     case "$kind" in
       private-key) printf '%s%s\n' '-----BEGIN ' 'PRIVATE KEY-----' >"$repo/leak.txt" ;;
@@ -147,6 +167,8 @@ test_sensitive_content() {
       windows-user-path) printf '%s:\\%s\\%s\\private\n' C Users demo >"$repo/leak.txt" ;;
       access-token) printf '%s%s\n' ghp_ aaaaaaaaaaaaaaaaaaaa >"$repo/leak.txt" ;;
       credential-url) printf '%s://%s:%s@%s/repo\n' https user pass example.invalid >"$repo/leak.txt" ;;
+      diff-header-user-path) printf '++ /%s/%s/private\n' home demo >"$repo/leak.txt" ;;
+      diff-header-token) printf '++ %s%s\n' ghp_ aaaaaaaaaaaaaaaaaaaa >"$repo/leak.txt" ;;
     esac
     commit_changes
     expect_failure "added content contains a credential or machine-specific path"
@@ -157,6 +179,7 @@ test_line_categories
 test_implementation_limit
 test_handwritten_warning
 test_unverified_generated_limit
+test_skill_helper_limit
 test_forbidden_paths
 test_synthetic_state_fixture
 test_binary_rejection
