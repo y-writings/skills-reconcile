@@ -44,4 +44,4 @@ jobs:
           install: false
           cache: false
       - name: Test in the pinned container
-        run: mise run container:test
+        run: mise run --skip-tools container:test
