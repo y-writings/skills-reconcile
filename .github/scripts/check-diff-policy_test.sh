@@ -261,6 +261,17 @@ test_added_content_scan() {
   expect_failure 'added content contains a credential or machine-specific path'
 
   new_repo
+  printf '%s\n' "\"path\":\"\\/${home_dir}\\/demo\\/private\"" >"$repo/leak.json"
+  commit_changes
+  expect_failure 'added content contains a credential or machine-specific path'
+
+  new_repo
+  local database_scheme=postgresql
+  printf '%s\n' "DATABASE_URL=${database_scheme}://demo:synthetic@db.example.invalid/app" >"$repo/leak.env"
+  commit_changes
+  expect_failure 'added content contains a credential or machine-specific path'
+
+  new_repo
   local token_prefix=ghp_
   printf '%s%s\n' "$token_prefix" aaaaaaaaaaaaaaaaaaaa >"$repo/leak.txt"
   git -C "$repo" add leak.txt

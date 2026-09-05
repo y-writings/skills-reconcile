@@ -122,10 +122,11 @@ is_sensitive_line() {
   local aws_key_pattern
   local openai_key_pattern
 
+  line=${line//\\\//\/}
   file_uri_boundary=$'(^|[[:space:]=,"\'`({<]|\\[)'
   path_boundary=$'(^|[[:space:]=:,"\'`({<]|\\[)'
   private_key_pattern='-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY-----'
-  credential_url_pattern='https?://[^[:space:]/:@]+:[^[:space:]@]+@'
+  credential_url_pattern='(^|[^[:alnum:]+.-])[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]/:@]+:[^[:space:]@]+@'
   unix_home_pattern="${path_boundary}/(Users|home)/[^/[:space:]]+"
   root_home_pattern="${path_boundary}/root([^[:alnum:]_.-]|$)"
   windows_home_pattern="${path_boundary}[A-Za-z]:\\\\+Users\\\\+[^\\\\[:space:]]+"

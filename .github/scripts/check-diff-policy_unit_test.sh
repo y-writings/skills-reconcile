@@ -152,6 +152,8 @@ test_sensitive_lines() {
   local openai_prefix=sk-
   local scheme=https
   local file_scheme=file
+  local database_scheme=postgresql
+  local compound_scheme=git+https
 
   assert_sensitive "/${home_dir}/demo/private"
   assert_sensitive "HOME=/${home_dir}/demo"
@@ -164,22 +166,28 @@ test_sensitive_lines() {
   assert_sensitive "C:\\${users_dir}\\demo\\private"
   assert_sensitive "C:\\\\${users_dir}\\\\demo\\\\private"
   assert_sensitive "C:/${users_dir}/demo/private"
+  assert_sensitive "\"path\":\"\\/${home_dir}\\/demo\\/private\""
   assert_sensitive "${file_scheme}:///${home_dir}/demo/private"
   assert_sensitive "${file_scheme}:///${users_dir}/demo/private"
   assert_sensitive "${file_scheme}:///${root_dir}/private"
   assert_sensitive "${file_scheme}://localhost/${home_dir}/demo/private"
   assert_sensitive "${file_scheme}:///C:/${users_dir}/demo/private"
+  assert_sensitive "\"uri\":\"${file_scheme}:\\/\\/\\/${home_dir}\\/demo\\/private\""
   assert_sensitive "-----BEGIN ${key_type} KEY-----"
   assert_sensitive "${github_prefix}aaaaaaaaaaaaaaaaaaaa"
   assert_sensitive "${fine_grained_prefix}aaaaaaaaaaaaaaaaaaaa"
   assert_sensitive "${aws_prefix}ABCDEFGHIJKLMNOP"
   assert_sensitive "${openai_prefix}aaaaaaaaaaaaaaaaaaaa"
   assert_sensitive "${scheme}://user:pass@example.invalid/repo"
+  assert_sensitive "${database_scheme}://demo:synthetic@db.example.invalid/app"
+  assert_sensitive "${compound_scheme}://demo:synthetic@example.invalid/repo"
+  assert_sensitive "\"url\":\"${database_scheme}:\\/\\/demo:synthetic@db.example.invalid\\/app\""
 
   assert_safe_line 'https://docs.example.invalid/home/getting-started'
   assert_safe_line 'https://docs.example.invalid/Users/getting-started'
   assert_safe_line 'https://docs.example.invalid/root/guide'
   assert_safe_line 'https://docs.example.invalid/file:///home/getting-started'
+  assert_safe_line 'https:\/\/docs.example.invalid\/home\/getting-started'
   assert_safe_line 'profile:///home/demo/private'
   assert_safe_line '/homepage/example'
   assert_safe_line '/homebrew/bin'
@@ -190,6 +198,8 @@ test_sensitive_lines() {
   assert_safe_line "/${home_dir}/"
   assert_safe_line "/${users_dir}"
   assert_safe_line 'https://user@example.invalid/repo'
+  assert_safe_line 'postgresql://demo@db.example.invalid/app'
+  assert_safe_line 'https://example.invalid/path:segment@example.invalid'
   assert_safe_line "${github_prefix}short"
   assert_safe_line "x${github_prefix}aaaaaaaaaaaaaaaaaaaa"
   assert_safe_line "${aws_prefix}SHORT"
