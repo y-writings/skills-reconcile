@@ -18,8 +18,7 @@ WORKDIR /workspace
 
 FROM toolchain AS test
 
-COPY go.mod ./
-COPY cmd ./cmd
+COPY . ./
 
 RUN test "$(go env GOVERSION)" = "go1.24.0" \
     && test "$(node --version)" = "v22.20.0" \
