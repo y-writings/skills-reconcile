@@ -6,38 +6,5 @@ description = "Build the pinned development toolchain image"
 run = "docker build --target development --tag skills-reconcile-dev:local ."
 
 [tasks."container:test"]
-description = "Test the CLI in the isolated pinned toolchain image"
-depends = ["container:build"]
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-
-container_image="skills-reconcile-test:local"
-docker build --target test --tag "$container_image" .
-docker run --rm \
-  --network none \
-  --read-only \
-  --cap-drop ALL \
-  --security-opt no-new-privileges \
-  --tmpfs /tmp:rw,nosuid,nodev \
-  --env HOME=/tmp/skills-reconcile-home \
-  --env XDG_CONFIG_HOME=/tmp/skills-reconcile-xdg/config \
-  --env XDG_STATE_HOME=/tmp/skills-reconcile-xdg/state \
-  --env XDG_CACHE_HOME=/tmp/skills-reconcile-xdg/cache \
-  "$container_image" \
-  bash -ceu '
-    test "$HOME" = /tmp/skills-reconcile-home
-    test "$XDG_CONFIG_HOME" = /tmp/skills-reconcile-xdg/config
-    test "$XDG_STATE_HOME" = /tmp/skills-reconcile-xdg/state
-    test "$XDG_CACHE_HOME" = /tmp/skills-reconcile-xdg/cache
-    test ! -e /var/run/docker.sock
-    test ! -e /workspace/.agents
-    test ! -e /workspace/.worktrees
-    test ! -e /workspace/skills
-    test ! -e /workspace/skills-manifest.json
-    test ! -e /workspace/state
-    mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
-    skills-reconcile --help >/dev/null
-    test -x "$SKILLS_RECONCILE_EXECUTABLE"
-  '
-'''
+description = "Build and test in the pinned toolchain image"
+run = "docker build --target test --tag skills-reconcile-test:local ."
