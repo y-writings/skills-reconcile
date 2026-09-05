@@ -148,6 +148,7 @@ test_sensitive_lines() {
   local aws_prefix=AKIA
   local openai_prefix=sk-
   local scheme=https
+  local file_scheme=file
 
   assert_sensitive "/${home_dir}/demo/private"
   assert_sensitive "HOME=/${home_dir}/demo"
@@ -158,6 +159,11 @@ test_sensitive_lines() {
   assert_sensitive "/${root_dir}/.agents/private"
   assert_sensitive "HOME=/${root_dir}"
   assert_sensitive "C:\\${users_dir}\\demo\\private"
+  assert_sensitive "${file_scheme}:///${home_dir}/demo/private"
+  assert_sensitive "${file_scheme}:///${users_dir}/demo/private"
+  assert_sensitive "${file_scheme}:///${root_dir}/private"
+  assert_sensitive "${file_scheme}://localhost/${home_dir}/demo/private"
+  assert_sensitive "${file_scheme}:///C:/${users_dir}/demo/private"
   assert_sensitive "-----BEGIN ${key_type} KEY-----"
   assert_sensitive "${github_prefix}aaaaaaaaaaaaaaaaaaaa"
   assert_sensitive "${fine_grained_prefix}aaaaaaaaaaaaaaaaaaaa"
@@ -168,6 +174,8 @@ test_sensitive_lines() {
   assert_safe_line 'https://docs.example.invalid/home/getting-started'
   assert_safe_line 'https://docs.example.invalid/Users/getting-started'
   assert_safe_line 'https://docs.example.invalid/root/guide'
+  assert_safe_line 'https://docs.example.invalid/file:///home/getting-started'
+  assert_safe_line 'profile:///home/demo/private'
   assert_safe_line '/homepage/example'
   assert_safe_line '/homebrew/bin'
   assert_safe_line '/rooted/path'

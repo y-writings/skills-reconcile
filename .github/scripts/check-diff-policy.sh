@@ -104,23 +104,31 @@ extract_added_lines() {
 is_sensitive_line() {
   local line=$1
   local LC_ALL=C
+  local file_uri_boundary
   local path_boundary
   local private_key_pattern
   local credential_url_pattern
   local unix_home_pattern
   local root_home_pattern
   local windows_home_pattern
+  local file_uri_unix_home_pattern
+  local file_uri_root_home_pattern
+  local file_uri_windows_home_pattern
   local github_token_pattern
   local fine_grained_token_pattern
   local aws_key_pattern
   local openai_key_pattern
 
+  file_uri_boundary=$'(^|[[:space:]=,"\'`({<]|\\[)'
   path_boundary=$'(^|[[:space:]=:,"\'`({<]|\\[)'
   private_key_pattern='-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY-----'
   credential_url_pattern='https?://[^[:space:]/:@]+:[^[:space:]@]+@'
   unix_home_pattern="${path_boundary}/(Users|home)/[^/[:space:]]+"
   root_home_pattern="${path_boundary}/root([^[:alnum:]_.-]|$)"
   windows_home_pattern="${path_boundary}[A-Za-z]:\\\\Users\\\\[^\\\\[:space:]]+"
+  file_uri_unix_home_pattern="${file_uri_boundary}file:(//localhost|//)?/(Users|home)/[^/[:space:]]+"
+  file_uri_root_home_pattern="${file_uri_boundary}file:(//localhost|//)?/root([^[:alnum:]_.-]|$)"
+  file_uri_windows_home_pattern="${file_uri_boundary}file:(//localhost|//)?/[A-Za-z]:/(Users)/[^/[:space:]]+"
   github_token_pattern='(^|[^[:alnum:]_])gh[pousr]_[A-Za-z0-9]{20,}([^[:alnum:]_]|$)'
   fine_grained_token_pattern='(^|[^[:alnum:]_])github_pat_[A-Za-z0-9_]{20,}([^[:alnum:]_]|$)'
   aws_key_pattern='(^|[^[:alnum:]_])AKIA[A-Z0-9]{16}([^[:alnum:]_]|$)'
@@ -131,6 +139,9 @@ is_sensitive_line() {
     [[ "$line" =~ $unix_home_pattern ]] ||
     [[ "$line" =~ $root_home_pattern ]] ||
     [[ "$line" =~ $windows_home_pattern ]] ||
+    [[ "$line" =~ $file_uri_unix_home_pattern ]] ||
+    [[ "$line" =~ $file_uri_root_home_pattern ]] ||
+    [[ "$line" =~ $file_uri_windows_home_pattern ]] ||
     [[ "$line" =~ $github_token_pattern ]] ||
     [[ "$line" =~ $fine_grained_token_pattern ]] ||
     [[ "$line" =~ $aws_key_pattern ]] ||
