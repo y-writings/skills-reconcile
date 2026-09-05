@@ -54,8 +54,9 @@ import path は移行先のモジュール名へ機械的に変更する。大�
 | `tools/skills/node_modules/**`   | lockfile からコンテナ内で再構築する |
 | `$HOME` 以下の Skill・設定・lock | 利用者固有の状態である              |
 
-CI には禁止パス検査を置き、`skills/**`、実運用 manifest、状態ファイルが誤って追加された場合は
-失敗させる。テスト fixture は `internal/**/testdata` または一時ディレクトリだけに置く。
+`skills/**`、実運用 manifest、状態ファイルの混入は、merge baseからの最終差分監査とPRレビューで
+確認する。機密情報の機械的な検出は既存security scanに委ねる。テスト fixture は
+`internal/**/testdata` または一時ディレクトリだけに置く。
 
 ## 維持する契約
 
