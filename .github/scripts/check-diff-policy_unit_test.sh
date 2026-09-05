@@ -96,6 +96,8 @@ test_classification_precedence() {
 }
 
 test_forbidden_paths() {
+  assert_forbidden .worktrees/skills 'source skills worktree is not allowed'
+  assert_forbidden .worktrees/skills/SKILL.md 'source skills worktree is not allowed'
   assert_forbidden skills 'root skills content is not allowed'
   assert_forbidden skills/example/SKILL.md 'root skills content is not allowed'
   assert_forbidden skills-manifest.json 'a root skills-manifest.json is not allowed'
@@ -108,6 +110,7 @@ test_forbidden_paths() {
 
   assert_allowed_path internal/example/testdata/.skill-lock.json
   assert_allowed_path internal/example/testdata/workspace-projections.json
+  assert_allowed_path .worktrees/other/reference.md
   assert_allowed_path cmd/skills-reconcile/main.go
   assert_allowed_path docs/skills-manifest.json
 }
@@ -159,6 +162,8 @@ test_sensitive_lines() {
   assert_sensitive "/${root_dir}/.agents/private"
   assert_sensitive "HOME=/${root_dir}"
   assert_sensitive "C:\\${users_dir}\\demo\\private"
+  assert_sensitive "C:\\\\${users_dir}\\\\demo\\\\private"
+  assert_sensitive "C:/${users_dir}/demo/private"
   assert_sensitive "${file_scheme}:///${home_dir}/demo/private"
   assert_sensitive "${file_scheme}:///${users_dir}/demo/private"
   assert_sensitive "${file_scheme}:///${root_dir}/private"

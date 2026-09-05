@@ -145,6 +145,19 @@ test_literal_git_paths() {
   expect_failure 'root skills content is not allowed'
 }
 
+test_source_worktree_rejection() {
+  new_repo
+  mkdir -p "$repo/.worktrees/skills"
+  printf 'synthetic\n' >"$repo/.worktrees/skills/guide.md"
+  commit_changes
+  expect_failure 'source skills worktree is not allowed'
+
+  new_repo
+  git -C "$repo" update-index --add --cacheinfo "160000,$base,.worktrees/skills"
+  git -C "$repo" commit --quiet -m changes
+  expect_failure 'source skills worktree is not allowed'
+}
+
 test_rename_records() {
   new_repo
   printf 'rename\n' >"$repo/old.txt"
@@ -242,6 +255,12 @@ test_added_content_scan() {
   expect_failure 'added content contains a credential or machine-specific path'
 
   new_repo
+  local users_dir=Users
+  printf '%s\n' "C:\\\\${users_dir}\\\\demo\\\\private" >"$repo/leak.txt"
+  commit_changes
+  expect_failure 'added content contains a credential or machine-specific path'
+
+  new_repo
   local token_prefix=ghp_
   printf '%s%s\n' "$token_prefix" aaaaaaaaaaaaaaaaaaaa >"$repo/leak.txt"
   git -C "$repo" add leak.txt
@@ -281,6 +300,7 @@ test_reported_categories
 test_line_limits
 test_unverified_generated_limit
 test_literal_git_paths
+test_source_worktree_rejection
 test_rename_records
 test_binary_rejection
 test_executable_documentation

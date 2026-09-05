@@ -62,6 +62,9 @@ forbidden_path_message() {
   local path=$1
 
   case "$path" in
+    .worktrees/skills | .worktrees/skills/*)
+      printf 'source skills worktree is not allowed\n'
+      ;;
     skills | skills/*)
       printf 'root skills content is not allowed\n'
       ;;
@@ -125,7 +128,7 @@ is_sensitive_line() {
   credential_url_pattern='https?://[^[:space:]/:@]+:[^[:space:]@]+@'
   unix_home_pattern="${path_boundary}/(Users|home)/[^/[:space:]]+"
   root_home_pattern="${path_boundary}/root([^[:alnum:]_.-]|$)"
-  windows_home_pattern="${path_boundary}[A-Za-z]:\\\\Users\\\\[^\\\\[:space:]]+"
+  windows_home_pattern="${path_boundary}[A-Za-z]:\\\\+Users\\\\+[^\\\\[:space:]]+"
   file_uri_unix_home_pattern="${file_uri_boundary}file:(//localhost|//)?/(Users|home)/[^/[:space:]]+"
   file_uri_root_home_pattern="${file_uri_boundary}file:(//localhost|//)?/root([^[:alnum:]_.-]|$)"
   file_uri_windows_home_pattern="${file_uri_boundary}file:(//localhost|//)?/[A-Za-z]:/(Users)/[^/[:space:]]+"
