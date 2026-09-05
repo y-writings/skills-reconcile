@@ -1,0 +1,62 @@
+name: "[01] Skills reconcile CI"
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  diff-policy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - name: Test policy decisions
+        run: .github/scripts/check-diff-policy_unit_test.sh
+      - name: Test policy against Git repositories
+        run: .github/scripts/check-diff-policy_test.sh
+      - name: Check pull request diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: .github/scripts/check-diff-policy.sh "$BASE_SHA" "$HEAD_SHA"
+  build-unit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Check format, tests, static analysis, and build
+        run: |
+          test "$(go env GOVERSION)" = "go1.24.0"
+          unformatted="$(gofmt -l .)"
+          test -z "$unformatted"
+          go test ./...
+          go vet ./...
+          go build ./...
+      - name: Smoke test the CLI
+        run: go run ./cmd/skills-reconcile --help >/dev/null
+  nix-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - name: Check flake outputs and package
+        run: |
+          nix flake check --all-systems
+          nix build .#skills-reconcile
+          ./result/bin/skills-reconcile --help >/dev/null
+          nix run .#skills-reconcile -- --help >/dev/null
+          nix run .#default -- --help >/dev/null
+  integration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.6
+          install: false
+          cache: false
+      - name: Test in the pinned container
+        run: mise run container:test
