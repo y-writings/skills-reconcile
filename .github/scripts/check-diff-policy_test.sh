@@ -44,11 +44,13 @@ expect_failure() {
 test_line_categories() {
   new_repo
   mkdir -p "$repo/cmd/app" "$repo/internal/example/testdata" "$repo/docs"
+  local unicode_doc=$'docs/日本語\tline\nbreak.md'
   printf 'change\n' >>"$repo/main.go"
   printf 'package app\n' >"$repo/cmd/app/main_test.go"
   printf '{}\n' >"$repo/internal/example/testdata/fixture.json"
   printf '{}\n' >"$repo/flake.lock"
   printf 'note\n' >"$repo/docs/note.md"
+  printf 'unicode note\n' >"$repo/$unicode_doc"
   printf 'rename\n' >"$repo/old.txt"
   git -C "$repo" add old.txt
   git -C "$repo" commit --quiet -m rename-base
@@ -57,13 +59,13 @@ test_line_categories() {
   commit_changes
 
   output=$(cd "$repo" && "$policy_script" "$base" HEAD 2>&1)
-  assert_contains "$output" "Handwritten implementation: 1"
+  assert_contains "$output" "Handwritten implementation: 2"
   assert_contains "$output" "Tests: 1"
   assert_contains "$output" "Handwritten fixtures: 1"
-  assert_contains "$output" "Generated files: 1"
-  assert_contains "$output" "Documentation: 1"
+  assert_contains "$output" "Generated files counted as implementation: 1"
+  assert_contains "$output" "Documentation: 2"
   assert_contains "$output" "Pure renames: 1 files"
-  assert_contains "$output" "Handwritten total: 3"
+  assert_contains "$output" "Handwritten total: 4"
 }
 
 test_implementation_limit() {
@@ -79,6 +81,17 @@ test_handwritten_warning() {
   commit_changes
   output=$(cd "$repo" && "$policy_script" "$base" HEAD 2>&1)
   assert_contains "$output" "WARNING: handwritten total exceeds 1000 changed lines"
+}
+
+test_unverified_generated_limit() {
+  local generated_path
+  for generated_path in flake.lock go.sum tools/skills/package-lock.json; do
+    new_repo
+    mkdir -p "$repo/$(dirname "$generated_path")"
+    awk 'BEGIN { for (i = 1; i <= 501; i++) print "line" i }' >"$repo/$generated_path"
+    commit_changes
+    expect_failure "handwritten implementation exceeds 500 changed lines"
+  done
 }
 
 test_forbidden_paths() {
@@ -97,6 +110,13 @@ test_forbidden_paths() {
     commit_changes
     expect_failure "not allowed"
   done
+
+  new_repo
+  path=$'skills/日本語\tline\nbreak/SKILL.md'
+  mkdir -p "$(dirname "$repo/$path")"
+  printf 'synthetic\n' >"$repo/$path"
+  commit_changes
+  expect_failure "root skills content is not allowed"
 }
 
 test_synthetic_state_fixture() {
@@ -117,11 +137,13 @@ test_binary_rejection() {
 
 test_sensitive_content() {
   local kind
-  for kind in private-key unix-user-path windows-user-path access-token credential-url; do
+  for kind in private-key unix-user-path root-home-path unterminated-home-path windows-user-path access-token credential-url; do
     new_repo
     case "$kind" in
       private-key) printf '%s%s\n' '-----BEGIN ' 'PRIVATE KEY-----' >"$repo/leak.txt" ;;
       unix-user-path) printf '/%s/%s/private\n' Users demo >"$repo/leak.txt" ;;
+      root-home-path) printf '/%s/.agents/private\n' root >"$repo/leak.txt" ;;
+      unterminated-home-path) printf 'HOME=/%s/%s\n' home demo >"$repo/leak.txt" ;;
       windows-user-path) printf '%s:\\%s\\%s\\private\n' C Users demo >"$repo/leak.txt" ;;
       access-token) printf '%s%s\n' ghp_ aaaaaaaaaaaaaaaaaaaa >"$repo/leak.txt" ;;
       credential-url) printf '%s://%s:%s@%s/repo\n' https user pass example.invalid >"$repo/leak.txt" ;;
@@ -134,6 +156,7 @@ test_sensitive_content() {
 test_line_categories
 test_implementation_limit
 test_handwritten_warning
+test_unverified_generated_limit
 test_forbidden_paths
 test_synthetic_state_fixture
 test_binary_rejection
