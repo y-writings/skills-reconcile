@@ -182,7 +182,7 @@ func TestResolveCanonicalizesWorkspaceWithoutReadingOrCreatingManifest(t *testin
 	}
 }
 
-func TestResolveLegacyManifestOverridesWorkspaceAndResolvesOnlyParent(t *testing.T) {
+func TestResolveExplicitManifestOverridesWorkspaceAndResolvesOnlyParent(t *testing.T) {
 	base := isolateResolve(t)
 	parent := filepath.Join(base, "parent")
 	makeDir(t, parent)

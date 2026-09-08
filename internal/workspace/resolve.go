@@ -9,11 +9,11 @@ import (
 )
 
 // Resolve locates a workspace and manifest without searching parent directories
-// or reading the manifest. A legacy manifest path takes precedence over workspace
+// or reading the manifest. An explicit manifest path takes precedence over workspace
 // selection and may be relative; explicitly selected workspaces must be absolute.
-func Resolve(flagValue, legacyManifest string) (string, string, error) {
-	if legacyManifest != "" {
-		path, err := filepath.Abs(legacyManifest)
+func Resolve(flagValue, explicitManifestPath string) (string, string, error) {
+	if explicitManifestPath != "" {
+		path, err := filepath.Abs(explicitManifestPath)
 		if err != nil {
 			return "", "", err
 		}
