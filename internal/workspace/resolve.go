@@ -35,6 +35,9 @@ func Resolve(flagValue, explicitManifestPath string) (string, string, error) {
 			}
 		}
 		if configHome != "" {
+			if !filepath.IsAbs(configHome) {
+				return "", "", errors.New("config directory must be absolute")
+			}
 			data, err := os.ReadFile(filepath.Join(configHome, "skills-reconcile", "config.json"))
 			if err == nil {
 				var config struct {

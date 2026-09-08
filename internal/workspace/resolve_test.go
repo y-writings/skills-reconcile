@@ -81,12 +81,26 @@ func TestResolveConfigLocation(t *testing.T) {
 }
 
 func TestResolveExplicitSelectionDoesNotReadLowerPriorityConfig(t *testing.T) {
-	for _, selector := range []string{"flag", "environment", "manifest"} {
-		t.Run(selector, func(t *testing.T) {
+	for _, tc := range []struct {
+		name, selector string
+		relativeConfig bool
+	}{
+		{"flag", "flag", false},
+		{"environment", "environment", false},
+		{"manifest", "manifest", false},
+		{"flag with relative config", "flag", true},
+		{"environment with relative config", "environment", true},
+		{"manifest with relative config", "manifest", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			base := isolateResolve(t)
+			if tc.relativeConfig {
+				t.Setenv("XDG_CONFIG_HOME", "relative-config")
+				t.Setenv("HOME", "relative-home")
+			}
 			writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), `{broken`)
 			var flag, manifest string
-			switch selector {
+			switch tc.selector {
 			case "flag":
 				flag = base
 			case "environment":
@@ -98,6 +112,51 @@ func TestResolveExplicitSelectionDoesNotReadLowerPriorityConfig(t *testing.T) {
 				t.Fatalf("selected workspace = %q, error = %v; want %q without reading config", root, err, base)
 			}
 		})
+	}
+}
+
+func TestResolveRejectsRelativeConfigDirectory(t *testing.T) {
+	for _, tc := range []struct{ name, variable, value, content string }{
+		{"XDG config exists", "XDG_CONFIG_HOME", "config", "valid"},
+		{"HOME config exists", "HOME", "home", "valid"},
+		{"XDG config missing", "XDG_CONFIG_HOME", "missing", ""},
+		{"HOME config missing", "HOME", "missing", ""},
+		{"dot directory before JSON decode", "XDG_CONFIG_HOME", ".", `{broken`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := isolateResolve(t)
+			t.Setenv("XDG_CONFIG_HOME", "")
+			t.Setenv(tc.variable, tc.value)
+			configDir := tc.value
+			if tc.variable == "HOME" {
+				configDir = filepath.Join(configDir, ".config")
+			}
+			content := tc.content
+			if content == "valid" {
+				content = fmt.Sprintf(`{"workspace":%q}`, base)
+			}
+			if content != "" {
+				writeConfig(t, configDir, content)
+			}
+
+			root, manifest, err := Resolve("", "")
+			if err == nil || err.Error() != "config directory must be absolute" || root != "" || manifest != "" {
+				t.Fatalf("relative config directory resolved (%q, %q), error = %v; want rejection before reading config", root, manifest, err)
+			}
+		})
+	}
+}
+
+func TestResolveAbsoluteXDGConfigIgnoresRelativeHOME(t *testing.T) {
+	base := isolateResolve(t)
+	t.Setenv("HOME", "relative-home")
+	want := filepath.Join(base, "configured-workspace")
+	makeDir(t, want)
+	writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(`{"workspace":%q}`, want))
+
+	root, manifest, err := Resolve("", "")
+	if err != nil || root != want || manifest != filepath.Join(want, "skills-manifest.json") {
+		t.Fatalf("absolute XDG config resolved (%q, %q), error = %v; want workspace %q without consulting HOME", root, manifest, err, want)
 	}
 }
 
