@@ -72,13 +72,23 @@
                 let
                   relativePath = pkgs.lib.removePrefix "${toString ./.}/" (toString path);
                 in
-                relativePath == "go.mod" || relativePath == "cmd" || pkgs.lib.hasPrefix "cmd/" relativePath;
+                relativePath == "go.mod"
+                || relativePath == "cmd"
+                || pkgs.lib.hasPrefix "cmd/" relativePath
+                || relativePath == "internal"
+                || pkgs.lib.hasPrefix "internal/" relativePath;
             };
             subPackages = [ "cmd/skills-reconcile" ];
 
             vendorHash = null;
 
             nativeBuildInputs = [ pkgs.makeWrapper ];
+
+            checkPhase = ''
+              runHook preCheck
+              go test ./...
+              runHook postCheck
+            '';
 
             postFixup = ''
               wrapProgram $out/bin/skills-reconcile \

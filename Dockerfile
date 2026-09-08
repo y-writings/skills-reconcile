@@ -19,6 +19,11 @@ WORKDIR /workspace
 
 FROM toolchain AS test
 
+ENV HOME=/tmp/skills-reconcile-home
+ENV XDG_CONFIG_HOME=/tmp/skills-reconcile-xdg/config
+ENV XDG_STATE_HOME=/tmp/skills-reconcile-xdg/state
+ENV XDG_CACHE_HOME=/tmp/skills-reconcile-xdg/cache
+
 COPY . ./
 
 RUN test "$(go env GOVERSION)" = "go1.24.0" \
