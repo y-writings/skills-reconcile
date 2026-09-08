@@ -51,6 +51,7 @@ func TestResolveConfigLocation(t *testing.T) {
 		{"missing XDG config does not fall back to HOME", "xdg", "home", "", false},
 		{"empty workspace uses cwd", "xdg", "home", `{"workspace":""}`, false},
 		{"missing workspace uses cwd", "xdg", "home", `{}`, false},
+		{"trailing JSON whitespace uses cwd", "xdg", "home", "{} \n\t", false},
 		{"no config location uses cwd", "", "", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -185,9 +186,11 @@ func TestResolveRejectsRelativeWorkspaceWithoutFallback(t *testing.T) {
 
 func TestResolveRejectsInvalidConfig(t *testing.T) {
 	for _, tc := range []struct{ name, content string }{
+		{"empty file", ""},
 		{"malformed JSON", `{`},
 		{"wrong workspace type", `{"workspace":42}`},
 		{"trailing JSON", `{} {}`},
+		{"trailing non-JSON data", `{} trailing`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			isolateResolve(t)
@@ -195,6 +198,22 @@ func TestResolveRejectsInvalidConfig(t *testing.T) {
 			root, manifest, err := Resolve("", "")
 			if err == nil || err.Error() != "invalid skills-reconcile config" || root != "" || manifest != "" {
 				t.Fatalf("invalid config resolved (%q, %q), error = %v", root, manifest, err)
+			}
+		})
+	}
+}
+
+func TestResolveRejectsUnknownConfigFields(t *testing.T) {
+	for _, tc := range []struct{ name, content string }{
+		{"unknown field instead of workspace", `{"workpace":%q}`},
+		{"unknown field alongside workspace", `{"workspace":%q,"unsupported":true}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := isolateResolve(t)
+			writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(tc.content, base))
+			root, manifest, err := Resolve("", "")
+			if err == nil || err.Error() != "invalid skills-reconcile config" || root != "" || manifest != "" {
+				t.Fatalf("unknown config field resolved (%q, %q), error = %v; want invalid-config rejection without fallback", root, manifest, err)
 			}
 		})
 	}

@@ -1,9 +1,11 @@
 package workspace
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -43,7 +45,10 @@ func Resolve(flagValue, explicitManifestPath string) (string, string, error) {
 				var config struct {
 					Workspace string `json:"workspace"`
 				}
-				if json.Unmarshal(data, &config) != nil {
+				decoder := json.NewDecoder(bytes.NewReader(data))
+				decoder.DisallowUnknownFields()
+				var trailing any
+				if decoder.Decode(&config) != nil || decoder.Decode(&trailing) != io.EOF {
 					return "", "", errors.New("invalid skills-reconcile config")
 				}
 				root = config.Workspace
