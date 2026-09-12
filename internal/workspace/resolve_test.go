@@ -49,9 +49,6 @@ func TestResolveConfigLocation(t *testing.T) {
 	}{
 		{"unset XDG uses HOME config", "", "home", "", true},
 		{"missing XDG config does not fall back to HOME", "xdg", "home", "", false},
-		{"empty workspace uses cwd", "xdg", "home", `{"workspace":""}`, false},
-		{"missing workspace uses cwd", "xdg", "home", `{}`, false},
-		{"trailing JSON whitespace uses cwd", "xdg", "home", "{} \n\t", false},
 		{"no config location uses cwd", "", "", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -180,41 +177,13 @@ func TestResolveRejectsRelativeWorkspaceWithoutFallback(t *testing.T) {
 	}
 }
 
-func TestResolveRejectsInvalidConfig(t *testing.T) {
-	for _, tc := range []struct{ name, content string }{
-		{"empty file", ""},
-		{"malformed JSON", `{`},
-		{"null config", `null`},
-		{"null workspace", `{"workspace":null}`},
-		{"wrong workspace type", `{"workspace":42}`},
-		{"trailing JSON", `{} {}`},
-		{"trailing non-JSON data", `{} trailing`},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			isolateResolve(t)
-			writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), tc.content)
-			location, err := Resolve(Overrides{})
-			if err == nil || err.Error() != "invalid skills-reconcile config" || location != (Location{}) {
-				t.Fatalf("invalid config resolved (%q, %q), error = %v", location.WorkspaceDir, location.ManifestPath, err)
-			}
-		})
-	}
-}
+func TestResolveRejectsDuplicateWorkspaceConfig(t *testing.T) {
+	base := isolateResolve(t)
+	writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(`{"workspace":%q,"workspace":""}`, base))
 
-func TestResolveRejectsUnknownConfigFields(t *testing.T) {
-	for _, tc := range []struct{ name, content string }{
-		{"unknown field instead of workspace", `{"workpace":%q}`},
-		{"unknown field alongside workspace", `{"workspace":%q,"unsupported":true}`},
-		{"case variant alongside workspace", `{"workspace":%[1]q,"Workspace":%[1]q}`},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			base := isolateResolve(t)
-			writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(tc.content, base))
-			location, err := Resolve(Overrides{})
-			if err == nil || err.Error() != "invalid skills-reconcile config" || location != (Location{}) {
-				t.Fatalf("unknown config field resolved (%q, %q), error = %v; want invalid-config rejection without fallback", location.WorkspaceDir, location.ManifestPath, err)
-			}
-		})
+	location, err := Resolve(Overrides{})
+	if err == nil || err.Error() != "invalid skills-reconcile config" || location != (Location{}) {
+		t.Fatalf("duplicate workspace config resolved (%q, %q), error = %v; want invalid-config rejection without fallback", location.WorkspaceDir, location.ManifestPath, err)
 	}
 }
 

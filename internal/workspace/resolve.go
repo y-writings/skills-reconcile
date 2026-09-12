@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -81,46 +80,4 @@ func requireAbsoluteWorkspaceDir(workspaceDir string) (string, error) {
 		return "", errors.New("configured workspace must be absolute")
 	}
 	return workspaceDir, nil
-}
-
-func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error) {
-	configHome := os.Getenv(envvars.XDGConfigHome)
-	if configHome == "" {
-		home := os.Getenv(envvars.Home)
-		if home == "" {
-			return "", false, nil
-		}
-		configHome = filepath.Join(home, ".config")
-	}
-	if !filepath.IsAbs(configHome) {
-		return "", false, errors.New("config directory must be absolute")
-	}
-	data, err := os.ReadFile(filepath.Join(configHome, "skills-reconcile", "config.json"))
-	if errors.Is(err, os.ErrNotExist) {
-		return "", false, nil
-	}
-	if err != nil {
-		return "", false, err
-	}
-	var config map[string]json.RawMessage
-	if json.Unmarshal(data, &config) != nil || config == nil {
-		return "", false, errors.New("invalid skills-reconcile config")
-	}
-	for key := range config {
-		if key != "workspace" {
-			return "", false, errors.New("invalid skills-reconcile config")
-		}
-	}
-	workspaceValue, found := config["workspace"]
-	if !found {
-		return "", false, nil
-	}
-	var workspace *string
-	if json.Unmarshal(workspaceValue, &workspace) != nil || workspace == nil {
-		return "", false, errors.New("invalid skills-reconcile config")
-	}
-	if *workspace == "" {
-		return "", false, nil
-	}
-	return *workspace, true, nil
 }
