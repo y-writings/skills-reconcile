@@ -12,8 +12,10 @@ func TestResolvePath(t *testing.T) {
 	for _, tc := range []struct {
 		name, xdgStateHome, home, want, wantError string
 	}{
-		{"XDG state overrides HOME", "/state", "/home", filepath.Join("/state", "skills", ".skill-lock.json"), ""},
+		{"absolute XDG state ignores relative HOME", "/state", "relative-home", filepath.Join("/state", "skills", ".skill-lock.json"), ""},
+		{"relative XDG state does not fall back to HOME", "relative-state", "/home", "", "global lock directory must be absolute"},
 		{"HOME fallback", "", "/home", filepath.Join("/home", ".agents", ".skill-lock.json"), ""},
+		{"relative HOME", "", "relative-home", "", "global lock directory must be absolute"},
 		{"missing HOME", "", "", "", "HOME is not set"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

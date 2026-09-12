@@ -46,10 +46,16 @@ func Path() (string, error) {
 // ResolvePath selects the XDG state path when configured and otherwise falls back to HOME.
 func ResolvePath(xdgStateHome, home string) (string, error) {
 	if xdgStateHome != "" {
+		if !filepath.IsAbs(xdgStateHome) {
+			return "", errors.New("global lock directory must be absolute")
+		}
 		return filepath.Join(xdgStateHome, "skills", ".skill-lock.json"), nil
 	}
 	if home == "" {
 		return "", errors.New("HOME is not set")
+	}
+	if !filepath.IsAbs(home) {
+		return "", errors.New("global lock directory must be absolute")
 	}
 	return filepath.Join(home, ".agents", ".skill-lock.json"), nil
 }
