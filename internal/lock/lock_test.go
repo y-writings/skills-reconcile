@@ -122,6 +122,32 @@ func TestReadObservedDistinguishesValidAndDanglingSymlinks(t *testing.T) {
 	if observed, err := ReadObserved(danglingLink); err == nil || !strings.Contains(err.Error(), "dangling symlink") || observed != nil {
 		t.Fatalf("ReadObserved(dangling symlink) = (%#v, %v), want dangling-symlink error", observed, err)
 	}
+
+	targetDir := filepath.Join(dir, "target-directory")
+	if err := os.Mkdir(targetDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	validAncestor := filepath.Join(dir, "valid-directory-link")
+	if err := os.Symlink(targetDir, validAncestor); err != nil {
+		t.Fatal(err)
+	}
+	if observed, err := ReadObserved(filepath.Join(validAncestor, "missing.json")); err != nil || !observed.Missing {
+		t.Fatalf("ReadObserved(valid symlink ancestor) = (%#v, %v), want missing lock", observed, err)
+	}
+
+	danglingAncestor := filepath.Join(dir, "dangling-directory-link")
+	if err := os.Symlink(filepath.Join(dir, "absent-directory"), danglingAncestor); err != nil {
+		t.Fatal(err)
+	}
+	descendant := filepath.Join(danglingAncestor, "skills", ".skill-lock.json")
+	if observed, err := ReadObserved(descendant); err == nil || !strings.Contains(err.Error(), "dangling symlink") || observed != nil {
+		t.Fatalf("ReadObserved(dangling symlink ancestor) = (%#v, %v), want dangling-symlink error", observed, err)
+	}
+
+	missingAncestor := filepath.Join(dir, "missing-directory", ".skill-lock.json")
+	if observed, err := ReadObserved(missingAncestor); err != nil || !observed.Missing {
+		t.Fatalf("ReadObserved(missing ancestor) = (%#v, %v), want missing lock", observed, err)
+	}
 }
 
 func TestInstallSourceSupportsOnlyRestorableSources(t *testing.T) {
@@ -133,6 +159,10 @@ func TestInstallSourceSupportsOnlyRestorableSources(t *testing.T) {
 	}{
 		{"GitHub", Entry{Source: "org/repo", SourceType: "github"}, "org/repo", true},
 		{"GitHub NUL control character", Entry{Source: "org/repo\x00", SourceType: "github"}, "", false},
+		{"GitHub shorthand query", Entry{Source: "org/repo?mirror=other", SourceType: "github"}, "", false},
+		{"GitHub prefix fragment", Entry{Source: "github:org/repo#v1", SourceType: "github"}, "", false},
+		{"GitHub shorthand skill selector", Entry{Source: "org/repo@skill", SourceType: "github"}, "", false},
+		{"GitHub prefix ref selector", Entry{Source: "github:org/repo:ref", SourceType: "github"}, "", false},
 		{"GitHub unsupported URL scheme", Entry{Source: "file://github.com/org/repo", SourceType: "github"}, "", false},
 		{"GitHub URL credentials", Entry{Source: "https://person@github.com/org/repo", SourceType: "github"}, "", false},
 		{"Git", Entry{Source: "repo", SourceType: "git", SourceURL: "git@example.com:repo.git"}, "git@example.com:repo.git", true},
@@ -155,6 +185,8 @@ func TestInstallSourceSupportsOnlyRestorableSources(t *testing.T) {
 		{"Git URL reclassified as self-hosted GitLab", Entry{Source: "repo", SourceType: "git", SourceURL: "https://example.com/org/repo/-/tree/main.git"}, "", false},
 		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://gitlab.com/org/repo.git"}, "https://gitlab.com/org/repo.git", true},
 		{"GitLab control character", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "gitlab:org/repo\x1b"}, "", false},
+		{"GitLab prefix query", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "gitlab:org/repo?mirror=other"}, "", false},
+		{"GitLab shorthand fragment", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "gitlab.com/org/repo#v1"}, "", false},
 		{"GitLab unsupported URL scheme", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "file://gitlab.com/org/repo"}, "", false},
 		{"GitLab URL credentials", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://person@gitlab.com/org/repo"}, "", false},
 		{"well-known base URL", Entry{SourceType: "well-known", SourceURL: "https://wrong.example.com/.well-known/skills/x/SKILL.md", SourceBaseURL: "https://example.com/skills"}, "https://example.com/skills", true},
@@ -278,9 +310,13 @@ func TestMatchesSourceRejectsUnsupportedObservedProviderURLs(t *testing.T) {
 	}{
 		{"GitHub", Entry{Source: "file://github.com/org/repo", SourceType: "github"}, "file://github.com/org/repo"},
 		{"GitHub control character", Entry{Source: "org/repo\x00", SourceType: "github"}, "org/repo\x00"},
+		{"GitHub shorthand query", Entry{Source: "org/repo?mirror=other", SourceType: "github"}, "org/repo?mirror=other"},
+		{"GitHub shorthand skill selector", Entry{Source: "org/repo@skill", SourceType: "github"}, "org/repo@skill"},
+		{"GitHub prefix ref selector", Entry{Source: "github:org/repo:ref", SourceType: "github"}, "github:org/repo:ref"},
 		{"GitHub credentials", Entry{Source: "https://person@github.com/org/repo", SourceType: "github"}, "https://person@github.com/org/repo"},
 		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "file://gitlab.com/org/repo"}, "file://gitlab.com/org/repo"},
 		{"GitLab control character", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "gitlab:org/repo\x1b"}, "gitlab:org/repo\x1b"},
+		{"GitLab shorthand fragment", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "gitlab.com/org/repo#v1"}, "gitlab.com/org/repo#v1"},
 		{"GitLab credentials", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://person@gitlab.com/org/repo"}, "https://person@gitlab.com/org/repo"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

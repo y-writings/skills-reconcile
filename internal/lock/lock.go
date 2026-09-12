@@ -94,18 +94,41 @@ func Read(path string) (*Lock, error) {
 func ReadObserved(path string) (*Lock, error) {
 	observed, err := Read(path)
 	if errors.Is(err, os.ErrNotExist) {
-		info, lstatErr := os.Lstat(path)
-		switch {
-		case lstatErr == nil && info.Mode()&os.ModeSymlink != 0:
-			return nil, errors.New("global lock is a dangling symlink")
-		case lstatErr == nil:
+		missing, inspectErr := inspectMissingLockPath(path)
+		if inspectErr != nil {
+			return nil, inspectErr
+		}
+		if !missing {
 			return nil, err
-		case !errors.Is(lstatErr, os.ErrNotExist):
-			return nil, fmt.Errorf("inspect global lock path: %w", lstatErr)
 		}
 		return &Lock{Version: 3, Skills: map[string]Entry{}, Missing: true}, nil
 	}
 	return observed, err
+}
+
+func inspectMissingLockPath(path string) (bool, error) {
+	lockPath := filepath.Clean(path)
+	for current := lockPath; ; current = filepath.Dir(current) {
+		info, err := os.Lstat(current)
+		switch {
+		case err == nil:
+			if info.Mode()&os.ModeSymlink != 0 {
+				if _, statErr := os.Stat(current); errors.Is(statErr, os.ErrNotExist) {
+					return false, errors.New("global lock path contains a dangling symlink")
+				} else if statErr != nil {
+					return false, fmt.Errorf("inspect global lock path: %w", statErr)
+				}
+			}
+			return current != lockPath, nil
+		case !errors.Is(err, os.ErrNotExist):
+			return false, fmt.Errorf("inspect global lock path: %w", err)
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			return true, nil
+		}
+	}
 }
 
 // InstallSource returns the source that can reproduce this observed installation.
@@ -164,7 +187,7 @@ func (e Entry) MatchesSource(source string) bool {
 }
 
 func githubRepository(source string) (string, bool) {
-	if hasUnsafeSourceRune(source) {
+	if hasUnsafeSourceRune(source) || strings.ContainsAny(source, "?#") {
 		return "", false
 	}
 	repository := source
@@ -178,6 +201,9 @@ func githubRepository(source string) (string, bool) {
 	} else if strings.Count(source, "/") != 1 || strings.Contains(source, ":") {
 		return "", false
 	}
+	if strings.ContainsAny(repository, "@:") {
+		return "", false
+	}
 
 	repository = strings.TrimSuffix(strings.TrimSuffix(repository, "/"), ".git")
 	parts := strings.Split(repository, "/")
@@ -188,7 +214,7 @@ func githubRepository(source string) (string, bool) {
 }
 
 func gitlabRepository(source string) (string, bool) {
-	if hasUnsafeSourceRune(source) {
+	if hasUnsafeSourceRune(source) || strings.ContainsAny(source, "?#") {
 		return "", false
 	}
 	var repository string
