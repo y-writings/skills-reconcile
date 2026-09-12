@@ -403,7 +403,7 @@ func validGenericGitSource(source string) bool {
 }
 
 func nonEmptyRepositoryPath(parsed *url.URL) bool {
-	return strings.Trim(parsed.EscapedPath(), "/") != ""
+	return strings.Trim(parsed.Path, "/") != ""
 }
 
 func validSCPGitSource(source string) bool {
@@ -411,7 +411,7 @@ func validSCPGitSource(source string) bool {
 		return false
 	}
 	separator := strings.IndexByte(source, ':')
-	if separator <= 0 || separator == len(source)-1 {
+	if separator <= 0 || strings.Trim(source[separator+1:], "/") == "" {
 		return false
 	}
 	authority := source[:separator]
