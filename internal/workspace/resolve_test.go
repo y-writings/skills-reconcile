@@ -280,6 +280,53 @@ func TestResolveExplicitManifestOverridesWorkspaceAndResolvesOnlyParent(t *testi
 	}
 }
 
+func TestResolveRejectsNonDirectoryWithoutFallback(t *testing.T) {
+	for _, tc := range []struct {
+		name, selector string
+		symlink        bool
+	}{
+		{"workspace file", "workspace", false},
+		{"environment file", "environment", false},
+		{"config file", "config", false},
+		{"manifest parent file", "manifest", false},
+		{"workspace file symlink", "workspace", true},
+		{"manifest parent file symlink", "manifest", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := isolateResolve(t)
+			path := filepath.Join(base, "file")
+			if err := os.WriteFile(path, []byte("synthetic"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if tc.symlink {
+				link := filepath.Join(base, "link")
+				if err := os.Symlink(path, link); err != nil {
+					t.Fatal(err)
+				}
+				path = link
+			}
+			writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(`{"workspace":%q}`, base))
+			var overrides Overrides
+			switch tc.selector {
+			case "workspace":
+				overrides.WorkspacePath = path
+				t.Setenv("SKILLS_RECONCILE_WORKSPACE", base)
+			case "environment":
+				t.Setenv("SKILLS_RECONCILE_WORKSPACE", path)
+			case "config":
+				writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(`{"workspace":%q}`, path))
+			case "manifest":
+				overrides.ManifestPath = filepath.Join(path, "inventory.json")
+				overrides.WorkspacePath = base
+			}
+			location, err := Resolve(overrides)
+			if err == nil || !strings.Contains(err.Error(), "workspace must be a directory") || location != (Location{}) {
+				t.Fatalf("non-directory resolved %+v, error = %v; want directory rejection without fallback", location, err)
+			}
+		})
+	}
+}
+
 func TestResolveRejectsMissingWorkspaceOrManifestParent(t *testing.T) {
 	base := isolateResolve(t)
 	missing := filepath.Join(base, "missing")

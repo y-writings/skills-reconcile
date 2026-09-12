@@ -34,7 +34,7 @@ func Resolve(overrides Overrides) (Location, error) {
 		if err != nil {
 			return Location{}, err
 		}
-		root, err := filepath.EvalSymlinks(filepath.Dir(path))
+		root, err := resolveDirectory(filepath.Dir(path))
 		if err != nil {
 			return Location{}, err
 		}
@@ -48,11 +48,26 @@ func Resolve(overrides Overrides) (Location, error) {
 		return Location{}, errors.New("configured workspace must be absolute")
 	}
 	root = filepath.Clean(root)
-	root, err = filepath.EvalSymlinks(root)
+	root, err = resolveDirectory(root)
 	if err != nil {
 		return Location{}, fmt.Errorf("resolve workspace: %w", err)
 	}
 	return Location{WorkspaceDir: root, ManifestPath: filepath.Join(root, "skills-manifest.json")}, nil
+}
+
+func resolveDirectory(path string) (string, error) {
+	root, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("workspace must be a directory: %s", root)
+	}
+	return root, nil
 }
 
 func selectWorkspace(explicitWorkspacePath string) (string, error) {
