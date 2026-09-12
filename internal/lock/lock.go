@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/y-writings/skills-reconcile/internal/envvars"
 )
@@ -39,6 +40,34 @@ type Entry struct {
 	Agents          []string `json:"agents,omitempty"`
 }
 
+var lockJSONFields = []string{"version", "skills", "dismissed", "lastSelectedAgents"}
+var entryJSONFields = []string{"source", "sourceType", "sourceUrl", "sourceBaseUrl", "ref", "skillPath", "skillFolderHash", "installedAt", "updatedAt", "agents"}
+
+func (lock *Lock) UnmarshalJSON(data []byte) error {
+	type plainLock Lock
+	return decodeCanonicalJSON(data, lockJSONFields, (*plainLock)(lock))
+}
+
+func (entry *Entry) UnmarshalJSON(data []byte) error {
+	type plainEntry Entry
+	return decodeCanonicalJSON(data, entryJSONFields, (*plainEntry)(entry))
+}
+
+func decodeCanonicalJSON(data []byte, canonicalFields []string, destination any) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for field := range fields {
+		for _, canonical := range canonicalFields {
+			if field != canonical && strings.EqualFold(field, canonical) {
+				return fmt.Errorf("non-canonical JSON field %q", field)
+			}
+		}
+	}
+	return json.Unmarshal(data, destination)
+}
+
 // Path returns the global lock path for the current environment.
 func Path() (string, error) {
 	return ResolvePath(os.Getenv(envvars.XDGStateHome), os.Getenv(envvars.Home))
@@ -63,9 +92,19 @@ func ResolvePath(xdgStateHome, home string) (string, error) {
 
 // Read decodes and validates an existing v3 global lock.
 func Read(path string) (*Lock, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("global lock is not a regular file")
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
+	}
+	if !utf8.Valid(data) {
+		return nil, errors.New("decode global lock: invalid UTF-8")
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -207,7 +246,7 @@ func githubRepository(source string) (string, bool) {
 
 	repository = strings.TrimSuffix(strings.TrimSuffix(repository, "/"), ".git")
 	parts := strings.Split(repository, "/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	if len(parts) != 2 || !validHostedRepositoryPart(parts[0]) || !validHostedRepositoryPart(parts[1]) {
 		return "", false
 	}
 	return strings.ToLower(parts[0] + "/" + parts[1]), true
@@ -243,11 +282,23 @@ func gitlabRepository(source string) (string, bool) {
 		return "", false
 	}
 	for _, part := range parts {
-		if part == "" {
+		if !validHostedRepositoryPart(part) {
 			return "", false
 		}
 	}
 	return "gitlab.com/" + repository, true
+}
+
+func validHostedRepositoryPart(part string) bool {
+	if part == "" || part == "." || part == ".." {
+		return false
+	}
+	return strings.IndexFunc(part, func(character rune) bool {
+		return (character < 'a' || character > 'z') &&
+			(character < 'A' || character > 'Z') &&
+			(character < '0' || character > '9') &&
+			character != '.' && character != '_' && character != '-'
+	}) < 0
 }
 
 func supportedRepositoryURLScheme(scheme string) bool {
