@@ -43,14 +43,12 @@ func decodeWorkspaceConfig(data []byte) (workspaceDir string, found bool, err er
 	if json.Unmarshal(data, &config) != nil || config == nil {
 		return "", false, errInvalidConfig
 	}
-	for key := range config {
-		if key != "workspace" {
-			return "", false, errInvalidConfig
-		}
+	if len(config) == 0 {
+		return "", false, nil
 	}
 	workspaceValue, found := config["workspace"]
-	if !found {
-		return "", false, nil
+	if len(config) != 1 || !found {
+		return "", false, errInvalidConfig
 	}
 	var workspace *string
 	if json.Unmarshal(workspaceValue, &workspace) != nil || workspace == nil {
