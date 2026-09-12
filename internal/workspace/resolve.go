@@ -109,8 +109,7 @@ func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	var trailing any
-	if decoder.Decode(&config) != nil || decoder.Decode(&trailing) != io.EOF || config == nil {
+	if decoder.Decode(&config) != nil || decoder.Decode(&struct{}{}) != io.EOF || config == nil {
 		return "", false, errors.New("invalid skills-reconcile config")
 	}
 	if len(config.Workspace) == 0 {
