@@ -4,5 +4,6 @@ package envvars
 const (
 	Workspace     = "SKILLS_RECONCILE_WORKSPACE"
 	XDGConfigHome = "XDG_CONFIG_HOME"
+	XDGStateHome  = "XDG_STATE_HOME"
 	Home          = "HOME"
 )
