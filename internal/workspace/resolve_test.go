@@ -30,13 +30,13 @@ func TestResolveWorkspacePrecedence(t *testing.T) {
 				writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(`{"workspace":%q}`, paths[tc.config]))
 			}
 
-			root, manifest, err := Resolve(paths[tc.flag], "")
+			location, err := Resolve(Overrides{WorkspacePath: paths[tc.flag]})
 			if err != nil {
 				t.Fatal(err)
 			}
 			want := paths[tc.want]
-			if root != want || manifest != filepath.Join(want, "skills-manifest.json") {
-				t.Fatalf("resolved (%q, %q), want workspace %q and its default manifest", root, manifest, want)
+			if location.WorkspaceDir != want || location.ManifestPath != filepath.Join(want, "skills-manifest.json") {
+				t.Fatalf("resolved (%q, %q), want workspace %q and its default manifest", location.WorkspaceDir, location.ManifestPath, want)
 			}
 		})
 	}
@@ -69,13 +69,13 @@ func TestResolveConfigLocation(t *testing.T) {
 				writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), tc.config)
 			}
 
-			root, _, err := Resolve("", "")
+			location, err := Resolve(Overrides{})
 			want := base
 			if tc.wantHome {
 				want = homeWorkspace
 			}
-			if err != nil || root != want {
-				t.Fatalf("workspace = %q, error = %v; want %q", root, err, want)
+			if err != nil || location.WorkspaceDir != want {
+				t.Fatalf("workspace = %q, error = %v; want %q", location.WorkspaceDir, err, want)
 			}
 		})
 	}
@@ -109,8 +109,8 @@ func TestResolveExplicitSelectionDoesNotReadLowerPriorityConfig(t *testing.T) {
 			case "manifest":
 				manifest = filepath.Join(base, "skills-manifest.json")
 			}
-			if root, _, err := Resolve(flag, manifest); err != nil || root != base {
-				t.Fatalf("selected workspace = %q, error = %v; want %q without reading config", root, err, base)
+			if location, err := Resolve(Overrides{WorkspacePath: flag, ManifestPath: manifest}); err != nil || location.WorkspaceDir != base {
+				t.Fatalf("selected workspace = %q, error = %v; want %q without reading config", location.WorkspaceDir, err, base)
 			}
 		})
 	}
@@ -140,9 +140,9 @@ func TestResolveRejectsRelativeConfigDirectory(t *testing.T) {
 				writeConfig(t, configDir, content)
 			}
 
-			root, manifest, err := Resolve("", "")
-			if err == nil || err.Error() != "config directory must be absolute" || root != "" || manifest != "" {
-				t.Fatalf("relative config directory resolved (%q, %q), error = %v; want rejection before reading config", root, manifest, err)
+			location, err := Resolve(Overrides{})
+			if err == nil || err.Error() != "config directory must be absolute" || location != (Location{}) {
+				t.Fatalf("relative config directory resolved (%q, %q), error = %v; want rejection before reading config", location.WorkspaceDir, location.ManifestPath, err)
 			}
 		})
 	}
@@ -155,9 +155,9 @@ func TestResolveAbsoluteXDGConfigIgnoresRelativeHOME(t *testing.T) {
 	makeDir(t, want)
 	writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(`{"workspace":%q}`, want))
 
-	root, manifest, err := Resolve("", "")
-	if err != nil || root != want || manifest != filepath.Join(want, "skills-manifest.json") {
-		t.Fatalf("absolute XDG config resolved (%q, %q), error = %v; want workspace %q without consulting HOME", root, manifest, err, want)
+	location, err := Resolve(Overrides{})
+	if err != nil || location.WorkspaceDir != want || location.ManifestPath != filepath.Join(want, "skills-manifest.json") {
+		t.Fatalf("absolute XDG config resolved (%q, %q), error = %v; want workspace %q without consulting HOME", location.WorkspaceDir, location.ManifestPath, err, want)
 	}
 }
 
@@ -176,9 +176,9 @@ func TestResolveRejectsRelativeWorkspaceWithoutFallback(t *testing.T) {
 			case "config":
 				writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), `{"workspace":"relative"}`)
 			}
-			root, manifest, err := Resolve(flag, "")
-			if err == nil || !strings.Contains(err.Error(), "configured workspace must be absolute") || root != "" || manifest != "" {
-				t.Fatalf("relative %s resolved (%q, %q), error = %v; want absolute-path rejection", selector, root, manifest, err)
+			location, err := Resolve(Overrides{WorkspacePath: flag})
+			if err == nil || !strings.Contains(err.Error(), "configured workspace must be absolute") || location != (Location{}) {
+				t.Fatalf("relative %s resolved (%q, %q), error = %v; want absolute-path rejection", selector, location.WorkspaceDir, location.ManifestPath, err)
 			}
 		})
 	}
@@ -195,9 +195,9 @@ func TestResolveRejectsInvalidConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			isolateResolve(t)
 			writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), tc.content)
-			root, manifest, err := Resolve("", "")
-			if err == nil || err.Error() != "invalid skills-reconcile config" || root != "" || manifest != "" {
-				t.Fatalf("invalid config resolved (%q, %q), error = %v", root, manifest, err)
+			location, err := Resolve(Overrides{})
+			if err == nil || err.Error() != "invalid skills-reconcile config" || location != (Location{}) {
+				t.Fatalf("invalid config resolved (%q, %q), error = %v", location.WorkspaceDir, location.ManifestPath, err)
 			}
 		})
 	}
@@ -211,9 +211,9 @@ func TestResolveRejectsUnknownConfigFields(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			base := isolateResolve(t)
 			writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(tc.content, base))
-			root, manifest, err := Resolve("", "")
-			if err == nil || err.Error() != "invalid skills-reconcile config" || root != "" || manifest != "" {
-				t.Fatalf("unknown config field resolved (%q, %q), error = %v; want invalid-config rejection without fallback", root, manifest, err)
+			location, err := Resolve(Overrides{})
+			if err == nil || err.Error() != "invalid skills-reconcile config" || location != (Location{}) {
+				t.Fatalf("unknown config field resolved (%q, %q), error = %v; want invalid-config rejection without fallback", location.WorkspaceDir, location.ManifestPath, err)
 			}
 		})
 	}
@@ -223,10 +223,10 @@ func TestResolveReportsConfigReadFailure(t *testing.T) {
 	isolateResolve(t)
 	// A directory fails ReadFile even when tests run as root in the container.
 	makeDir(t, filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "skills-reconcile", "config.json"))
-	root, manifest, err := Resolve("", "")
+	location, err := Resolve(Overrides{})
 	var pathErr *os.PathError
-	if !errors.As(err, &pathErr) || errors.Is(err, os.ErrNotExist) || root != "" || manifest != "" {
-		t.Fatalf("unreadable config resolved (%q, %q), error = %v; want filesystem error", root, manifest, err)
+	if !errors.As(err, &pathErr) || errors.Is(err, os.ErrNotExist) || location != (Location{}) {
+		t.Fatalf("unreadable config resolved (%q, %q), error = %v; want filesystem error", location.WorkspaceDir, location.ManifestPath, err)
 	}
 }
 
@@ -245,9 +245,9 @@ func TestResolveCanonicalizesWorkspaceWithoutReadingOrCreatingManifest(t *testin
 				t.Fatal(err)
 			}
 		}
-		root, manifest, err := Resolve(link+"/./", "")
-		if err != nil || root != target || manifest != manifestPath {
-			t.Fatalf("resolved (%q, %q), error = %v; want (%q, %q)", root, manifest, err, target, manifestPath)
+		location, err := Resolve(Overrides{WorkspacePath: link + "/./"})
+		if err != nil || location.WorkspaceDir != target || location.ManifestPath != manifestPath {
+			t.Fatalf("resolved (%q, %q), error = %v; want (%q, %q)", location.WorkspaceDir, location.ManifestPath, err, target, manifestPath)
 		}
 		data, readErr := os.ReadFile(manifestPath)
 		if content == "" {
@@ -272,10 +272,10 @@ func TestResolveExplicitManifestOverridesWorkspaceAndResolvesOnlyParent(t *testi
 		t.Fatal(err)
 	}
 	for _, path := range []string{"alias/inventory.json", filepath.Join(base, "alias", "inventory.json")} {
-		root, manifest, err := Resolve("invalid-relative-workspace", path)
+		location, err := Resolve(Overrides{WorkspacePath: "invalid-relative-workspace", ManifestPath: path})
 		want := filepath.Join(parent, "inventory.json")
-		if err != nil || root != parent || manifest != want {
-			t.Fatalf("manifest %q resolved (%q, %q), error = %v; want (%q, %q)", path, root, manifest, err, parent, want)
+		if err != nil || location.WorkspaceDir != parent || location.ManifestPath != want {
+			t.Fatalf("manifest %q resolved (%q, %q), error = %v; want (%q, %q)", path, location.WorkspaceDir, location.ManifestPath, err, parent, want)
 		}
 	}
 }
@@ -288,9 +288,9 @@ func TestResolveRejectsMissingWorkspaceOrManifestParent(t *testing.T) {
 		{"manifest parent", "", filepath.Join(missing, "inventory.json")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			root, manifest, err := Resolve(tc.flag, tc.manifest)
-			if !errors.Is(err, os.ErrNotExist) || root != "" || manifest != "" {
-				t.Fatalf("missing %s resolved (%q, %q), error = %v", tc.name, root, manifest, err)
+			location, err := Resolve(Overrides{WorkspacePath: tc.flag, ManifestPath: tc.manifest})
+			if !errors.Is(err, os.ErrNotExist) || location != (Location{}) {
+				t.Fatalf("missing %s resolved (%q, %q), error = %v", tc.name, location.WorkspaceDir, location.ManifestPath, err)
 			}
 			if _, err := os.Stat(missing); !errors.Is(err, os.ErrNotExist) {
 				t.Fatalf("resolver created missing directory: %v", err)
@@ -313,9 +313,9 @@ func TestResolveDoesNotSearchParentsOrReadOldNamespace(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(oldConfig, "config.json"), []byte(`{broken`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	root, manifest, err := Resolve("", "")
-	if err != nil || root != child || manifest != filepath.Join(child, "skills-manifest.json") {
-		t.Fatalf("resolved (%q, %q), error = %v; want cwd %q without legacy lookup or parent search", root, manifest, err, child)
+	location, err := Resolve(Overrides{})
+	if err != nil || location.WorkspaceDir != child || location.ManifestPath != filepath.Join(child, "skills-manifest.json") {
+		t.Fatalf("resolved (%q, %q), error = %v; want cwd %q without legacy lookup or parent search", location.WorkspaceDir, location.ManifestPath, err, child)
 	}
 }
 
