@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -40,19 +41,21 @@ type Entry struct {
 	Agents          []string `json:"agents,omitempty"`
 }
 
-var lockJSONFields = []string{"version", "skills", "dismissed", "lastSelectedAgents"}
-var entryJSONFields = []string{"source", "sourceType", "sourceUrl", "sourceBaseUrl", "ref", "skillPath", "skillFolderHash", "installedAt", "updatedAt", "agents"}
+var lockJSONFields, entryJSONFields = []string{"version", "skills", "dismissed", "lastSelectedAgents"}, []string{"source", "sourceType", "sourceUrl", "sourceBaseUrl", "ref", "skillPath", "skillFolderHash", "installedAt", "updatedAt", "agents"}
 
 func (lock *Lock) UnmarshalJSON(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := scanJSONValue(decoder); err != nil {
+		return err
+	}
 	type plainLock Lock
 	return decodeCanonicalJSON(data, lockJSONFields, (*plainLock)(lock))
 }
-
 func (entry *Entry) UnmarshalJSON(data []byte) error {
 	type plainEntry Entry
 	return decodeCanonicalJSON(data, entryJSONFields, (*plainEntry)(entry))
 }
-
 func decodeCanonicalJSON(data []byte, canonicalFields []string, destination any) error {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
@@ -66,6 +69,35 @@ func decodeCanonicalJSON(data []byte, canonicalFields []string, destination any)
 		}
 	}
 	return json.Unmarshal(data, destination)
+}
+func scanJSONValue(decoder *json.Decoder) error {
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delimiter, compound := token.(json.Delim)
+	if !compound {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	for decoder.More() {
+		if delimiter == '{' {
+			token, err = decoder.Token()
+			if err != nil {
+				return err
+			}
+			field := token.(string)
+			if _, duplicate := seen[field]; duplicate {
+				return fmt.Errorf("duplicate JSON field %q", field)
+			}
+			seen[field] = struct{}{}
+		}
+		if err := scanJSONValue(decoder); err != nil {
+			return err
+		}
+	}
+	_, err = decoder.Token()
+	return err
 }
 
 // Path returns the global lock path for the current environment.
@@ -289,16 +321,10 @@ func gitlabRepository(source string) (string, bool) {
 	return "gitlab.com/" + repository, true
 }
 
+var hostedRepositoryPartPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
 func validHostedRepositoryPart(part string) bool {
-	if part == "" || part == "." || part == ".." {
-		return false
-	}
-	return strings.IndexFunc(part, func(character rune) bool {
-		return (character < 'a' || character > 'z') &&
-			(character < 'A' || character > 'Z') &&
-			(character < '0' || character > '9') &&
-			character != '.' && character != '_' && character != '-'
-	}) < 0
+	return part != "." && part != ".." && hostedRepositoryPartPattern.MatchString(part)
 }
 
 func supportedRepositoryURLScheme(scheme string) bool {

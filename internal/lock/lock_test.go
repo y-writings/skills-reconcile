@@ -53,6 +53,10 @@ func TestReadObservedDistinguishesMissingFromInvalid(t *testing.T) {
 		{"malformed JSON", `{`, "decode global lock"},
 		{"invalid UTF-8", "{\"version\":3,\"skills\":{\"x\":{\"source\":\"org/repo\xff\",\"sourceType\":\"github\"}}}", "invalid UTF-8"},
 		{"trailing JSON", `{"version":3,"skills":{}} {}`, "trailing JSON"},
+		{"duplicate top-level field", `{"version":3,"skills":{},"skills":{"lost":{"source":"org/repo","sourceType":"github"}}}`, `duplicate JSON field "skills"`},
+		{"duplicate skill name", `{"version":3,"skills":{"x":{"source":"org/first","sourceType":"github"},"x":{"source":"org/second","sourceType":"github"}}}`, `duplicate JSON field "x"`},
+		{"duplicate provenance field", `{"version":3,"skills":{"x":{"source":"org/first","source":"org/second","sourceType":"github"}}}`, `duplicate JSON field "source"`},
+		{"escaped duplicate in future array", `{"version":3,"skills":{},"future":[{"x":1,"\u0078":2}]}`, `duplicate JSON field "x"`},
 		{"uppercase top-level field", `{"VERSION":3,"skills":{}}`, `non-canonical JSON field "VERSION"`},
 		{"mixed-case provenance field", `{"version":3,"skills":{"x":{"source":"repo","sourceType":"git","SourceUrl":"https://example.com/repo.git"}}}`, `non-canonical JSON field "SourceUrl"`},
 		{"unsupported version", `{"version":2,"skills":{}}`, "unsupported global lock version 2"},
@@ -87,7 +91,7 @@ func TestReadObservedDistinguishesMissingFromInvalid(t *testing.T) {
 
 func TestReadObservedReadsValidLockAndFutureFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lock.json")
-	content := `{"version":3,"skills":{"x":{"source":"example.com","sourceType":"well-known","sourceUrl":"https://cdn.example.com/x.tgz","sourceBaseUrl":"https://example.com/skills","ref":"v1","skillPath":"skills/x/SKILL.md","agents":["codex"]}},"futureField":true}`
+	content := `{"version":3,"skills":{"x":{"source":"example.com","sourceType":"well-known","sourceUrl":"https://cdn.example.com/x.tgz","sourceBaseUrl":"https://example.com/skills","ref":"v1","skillPath":"skills/x/SKILL.md","agents":["codex"]},"y":{"source":"org/repo","sourceType":"github"}},"futureField":{"number":1e1000}}`
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +104,7 @@ func TestReadObservedReadsValidLockAndFutureFields(t *testing.T) {
 		t.Fatal("ReadObserved() returned a nil lock without an error")
 	}
 	entry := observed.Skills["x"]
-	if observed.Missing || entry.SourceBaseURL != "https://example.com/skills" || entry.Ref != "v1" || entry.SkillPath != "skills/x/SKILL.md" || len(entry.Agents) != 1 || entry.Agents[0] != "codex" {
+	if observed.Missing || len(observed.Skills) != 2 || entry.SourceBaseURL != "https://example.com/skills" || entry.Ref != "v1" || entry.SkillPath != "skills/x/SKILL.md" || len(entry.Agents) != 1 || entry.Agents[0] != "codex" {
 		t.Fatalf("ReadObserved() = %#v, want decoded existing lock", observed)
 	}
 }
