@@ -205,6 +205,7 @@ func TestResolveRejectsUnknownConfigFields(t *testing.T) {
 	for _, tc := range []struct{ name, content string }{
 		{"unknown field instead of workspace", `{"workpace":%q}`},
 		{"unknown field alongside workspace", `{"workspace":%q,"unsupported":true}`},
+		{"case variant alongside workspace", `{"workspace":%[1]q,"Workspace":%[1]q}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			base := isolateResolve(t)

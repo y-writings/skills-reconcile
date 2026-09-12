@@ -1,11 +1,9 @@
 package workspace
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -104,19 +102,21 @@ func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error)
 	if err != nil {
 		return "", false, err
 	}
-	var config *struct {
-		Workspace json.RawMessage `json:"workspace"`
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&config) != nil || decoder.Decode(&struct{}{}) != io.EOF || config == nil {
+	var config map[string]json.RawMessage
+	if json.Unmarshal(data, &config) != nil || config == nil {
 		return "", false, errors.New("invalid skills-reconcile config")
 	}
-	if len(config.Workspace) == 0 {
+	for key := range config {
+		if key != "workspace" {
+			return "", false, errors.New("invalid skills-reconcile config")
+		}
+	}
+	workspaceValue, found := config["workspace"]
+	if !found {
 		return "", false, nil
 	}
 	var workspace *string
-	if json.Unmarshal(config.Workspace, &workspace) != nil || workspace == nil {
+	if json.Unmarshal(workspaceValue, &workspace) != nil || workspace == nil {
 		return "", false, errors.New("invalid skills-reconcile config")
 	}
 	if *workspace == "" {
