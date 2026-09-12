@@ -2,20 +2,18 @@
 package lock
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/y-writings/skills-reconcile/internal/envvars"
+	"github.com/y-writings/skills-reconcile/internal/jsondoc"
 )
 
 // Lock is the observed v3 global lock written by the skills CLI.
@@ -44,11 +42,6 @@ type Entry struct {
 var lockJSONFields, entryJSONFields = []string{"version", "skills", "dismissed", "lastSelectedAgents"}, []string{"source", "sourceType", "sourceUrl", "sourceBaseUrl", "ref", "skillPath", "skillFolderHash", "installedAt", "updatedAt", "agents"}
 
 func (lock *Lock) UnmarshalJSON(data []byte) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	if err := scanJSONValue(decoder); err != nil {
-		return err
-	}
 	type plainLock Lock
 	return decodeCanonicalJSON(data, lockJSONFields, (*plainLock)(lock))
 }
@@ -69,35 +62,6 @@ func decodeCanonicalJSON(data []byte, canonicalFields []string, destination any)
 		}
 	}
 	return json.Unmarshal(data, destination)
-}
-func scanJSONValue(decoder *json.Decoder) error {
-	token, err := decoder.Token()
-	if err != nil {
-		return err
-	}
-	delimiter, compound := token.(json.Delim)
-	if !compound {
-		return nil
-	}
-	seen := map[string]struct{}{}
-	for decoder.More() {
-		if delimiter == '{' {
-			token, err = decoder.Token()
-			if err != nil {
-				return err
-			}
-			field := token.(string)
-			if _, duplicate := seen[field]; duplicate {
-				return fmt.Errorf("duplicate JSON field %q", field)
-			}
-			seen[field] = struct{}{}
-		}
-		if err := scanJSONValue(decoder); err != nil {
-			return err
-		}
-	}
-	_, err = decoder.Token()
-	return err
 }
 
 // Path returns the global lock path for the current environment.
@@ -135,17 +99,13 @@ func Read(path string) (*Lock, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !utf8.Valid(data) {
-		return nil, errors.New("decode global lock: invalid UTF-8")
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	var observed Lock
-	if err := decoder.Decode(&observed); err != nil {
+	if err := jsondoc.Validate(data); err != nil {
 		return nil, fmt.Errorf("decode global lock: %w", err)
 	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return nil, errors.New("decode global lock: trailing JSON")
+
+	var observed Lock
+	if err := json.Unmarshal(data, &observed); err != nil {
+		return nil, fmt.Errorf("decode global lock: %w", err)
 	}
 	if observed.Version != 3 {
 		return nil, fmt.Errorf("unsupported global lock version %d", observed.Version)

@@ -51,12 +51,9 @@ func TestReadObservedDistinguishesMissingFromInvalid(t *testing.T) {
 		name, content, wantError string
 	}{
 		{"malformed JSON", `{`, "decode global lock"},
-		{"invalid UTF-8", "{\"version\":3,\"skills\":{\"x\":{\"source\":\"org/repo\xff\",\"sourceType\":\"github\"}}}", "invalid UTF-8"},
-		{"trailing JSON", `{"version":3,"skills":{}} {}`, "trailing JSON"},
-		{"duplicate top-level field", `{"version":3,"skills":{},"skills":{"lost":{"source":"org/repo","sourceType":"github"}}}`, `duplicate JSON field "skills"`},
-		{"duplicate skill name", `{"version":3,"skills":{"x":{"source":"org/first","sourceType":"github"},"x":{"source":"org/second","sourceType":"github"}}}`, `duplicate JSON field "x"`},
-		{"duplicate provenance field", `{"version":3,"skills":{"x":{"source":"org/first","source":"org/second","sourceType":"github"}}}`, `duplicate JSON field "source"`},
-		{"escaped duplicate in future array", `{"version":3,"skills":{},"future":[{"x":1,"\u0078":2}]}`, `duplicate JSON field "x"`},
+		{"invalid UTF-8", "{\"version\":3,\"skills\":{\"x\":{\"source\":\"org/repo\xff\",\"sourceType\":\"github\"}}}", "decode global lock: invalid UTF-8"},
+		{"trailing JSON", `{"version":3,"skills":{}} {}`, "decode global lock: trailing JSON"},
+		{"escaped duplicate in future array", `{"version":3,"skills":{},"future":[{"x":1,"\u0078":2}]}`, `decode global lock: duplicate JSON field "x"`},
 		{"uppercase top-level field", `{"VERSION":3,"skills":{}}`, `non-canonical JSON field "VERSION"`},
 		{"mixed-case provenance field", `{"version":3,"skills":{"x":{"source":"repo","sourceType":"git","SourceUrl":"https://example.com/repo.git"}}}`, `non-canonical JSON field "SourceUrl"`},
 		{"unsupported version", `{"version":2,"skills":{}}`, "unsupported global lock version 2"},
