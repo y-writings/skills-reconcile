@@ -104,17 +104,24 @@ func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error)
 	if err != nil {
 		return "", false, err
 	}
-	var config struct {
-		Workspace string `json:"workspace"`
+	var config *struct {
+		Workspace json.RawMessage `json:"workspace"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var trailing any
-	if decoder.Decode(&config) != nil || decoder.Decode(&trailing) != io.EOF {
+	if decoder.Decode(&config) != nil || decoder.Decode(&trailing) != io.EOF || config == nil {
 		return "", false, errors.New("invalid skills-reconcile config")
 	}
-	if config.Workspace == "" {
+	if len(config.Workspace) == 0 {
 		return "", false, nil
 	}
-	return config.Workspace, true, nil
+	var workspace *string
+	if json.Unmarshal(config.Workspace, &workspace) != nil || workspace == nil {
+		return "", false, errors.New("invalid skills-reconcile config")
+	}
+	if *workspace == "" {
+		return "", false, nil
+	}
+	return *workspace, true, nil
 }

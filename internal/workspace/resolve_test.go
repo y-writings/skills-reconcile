@@ -184,6 +184,8 @@ func TestResolveRejectsInvalidConfig(t *testing.T) {
 	for _, tc := range []struct{ name, content string }{
 		{"empty file", ""},
 		{"malformed JSON", `{`},
+		{"null config", `null`},
+		{"null workspace", `{"workspace":null}`},
 		{"wrong workspace type", `{"workspace":42}`},
 		{"trailing JSON", `{} {}`},
 		{"trailing non-JSON data", `{} trailing`},
