@@ -1,14 +1,13 @@
 package workspace
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/y-writings/skills-reconcile/internal/envvars"
+	"github.com/y-writings/skills-reconcile/internal/jsondoc"
 )
 
 var errInvalidConfig = errors.New("invalid skills-reconcile config")
@@ -36,35 +35,29 @@ func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error)
 }
 
 func decodeWorkspaceConfig(data []byte) (workspaceDir string, found bool, err error) {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	token, err := decoder.Token()
-	if err != nil || token != json.Delim('{') {
+	if jsondoc.Validate(data) != nil {
 		return "", false, errInvalidConfig
 	}
 
-	// Token iteration preserves duplicate members that Unmarshal would discard.
-	workspaceSeen := false
-	for decoder.More() {
-		token, err = decoder.Token()
-		key, ok := token.(string)
-		if err != nil || !ok || key != "workspace" || workspaceSeen {
-			return "", false, errInvalidConfig
-		}
-		workspaceSeen = true
-
-		var workspace *string
-		if decoder.Decode(&workspace) != nil || workspace == nil {
-			return "", false, errInvalidConfig
-		}
-		workspaceDir = *workspace
-	}
-
-	token, err = decoder.Token()
-	if err != nil || token != json.Delim('}') || decoder.Decode(&struct{}{}) != io.EOF {
+	var config map[string]json.RawMessage
+	if json.Unmarshal(data, &config) != nil || config == nil {
 		return "", false, errInvalidConfig
 	}
-	if workspaceDir == "" {
+	for key := range config {
+		if key != "workspace" {
+			return "", false, errInvalidConfig
+		}
+	}
+	workspaceValue, found := config["workspace"]
+	if !found {
 		return "", false, nil
 	}
-	return workspaceDir, true, nil
+	var workspace *string
+	if json.Unmarshal(workspaceValue, &workspace) != nil || workspace == nil {
+		return "", false, errInvalidConfig
+	}
+	if *workspace == "" {
+		return "", false, nil
+	}
+	return *workspace, true, nil
 }

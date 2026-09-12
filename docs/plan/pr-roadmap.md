@@ -16,7 +16,7 @@ workflow、shell script、mise など実行動作を変える設定は、この�
 なった時点で分割を検討し、500 行を超えた PR はレビューへ回さない。分割時にも、各 PR はビルド可能で、
 公開済み機能を壊してはならない。
 
-以下の 49 項目は順序と責務を示す初期候補であり、49 個の PR を必須とするものではない。同じ一つの
+以下の 50 項目は順序と責務を示す初期候補であり、50 個の PR を必須とするものではない。同じ一つの
 利用者向け機能を完成させる隣接項目は、実装差分が 500 行以下なら着手前の合意で統合できる。別の
 利用者向け機能や仕様判断は、行数に余裕があっても同居させない。
 
@@ -43,12 +43,17 @@ Goの直接build、Nix package、開発コンテナを同じCLI契約に対し�
 | ID  | PR の責務                                | 主な成果物                                              |    目安 | 完了条件                                                     |
 | --- | ---------------------------------------- | ------------------------------------------------------- | ------: | ------------------------------------------------------------ |
 | C01 | workspace と manifest の場所を解決する   | 優先順位、絶対パス検証、設定 fixture                    | 250–450 | flag、環境変数、設定、cwd の各経路を副作用なしで検証できる   |
+| J01 | JSON 文書の完全性を共通化する            | UTF-8、単一値、全階層の重複 member 拒否                 |  50–100 | workspace と後続 reader が同じ事前検証を利用できる           |
 | C02 | グローバル lock を読み取る               | lock decode、missing と invalid の区別、source identity | 300–450 | source provenance と復元可否を fixture で判定できる          |
 | C03 | agent 名と `skills ls` JSON を読む       | agent 正規化、一覧 decode、fake process                 | 300–450 | 不明 agent、壊れた JSON、外部コマンド失敗を区別できる        |
 | C04 | manifest のモデルと strict decode を移す | schema 型、未知 field・trailing JSON の拒否             | 250–400 | 合成 manifest を読み取れ、ファイル更新はまだ行わない         |
 | C05 | schema、default、名前を検証する          | version、agent、install name の規則                     | 250–430 | schema と名前衝突を実行前に拒否できる                        |
 | C06 | remote source を検証する                 | source、ref、skillPath、credential の規則               | 280–450 | portable でない remote entry を実行前に拒否できる            |
 | C07 | remote 範囲の `doctor` を公開する        | version 確認、入力・観測診断、CLI テスト                | 250–450 | container fixture に対して読み取り専用で成功・失敗を説明する |
+
+J01 が共有するのは、UTF-8、単一の JSON 値、全階層の重複 member 拒否だけとする。workspace の
+設定 key・型・null の扱いと、C02 以降の各 reader の schema・domain 検証は、それぞれの package に残す。
+C02 以降は、各 reader を移す PR で J01 の事前検証を decode 入口へ接続する。
 
 C04 から C06 の間では、不完全な manifest を CLI の通常経路へ通さない。C07 で公開する時点で、
 remote entry に必要な検証がすべて有効になっていることを確認する。
