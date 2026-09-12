@@ -133,11 +133,61 @@ func TestInstallSourceSupportsOnlyRestorableSources(t *testing.T) {
 	}{
 		{"GitHub", Entry{Source: "org/repo", SourceType: "github"}, "org/repo", true},
 		{"GitHub unsupported URL scheme", Entry{Source: "file://github.com/org/repo", SourceType: "github"}, "", false},
+		{"GitHub URL credentials", Entry{Source: "https://person@github.com/org/repo", SourceType: "github"}, "", false},
 		{"Git", Entry{Source: "repo", SourceType: "git", SourceURL: "git@example.com:repo.git"}, "git@example.com:repo.git", true},
+		{"Git HTTPS", Entry{Source: "repo", SourceType: "git", SourceURL: "https://example.com/repo.git"}, "https://example.com/repo.git", true},
+		{"Git SSH", Entry{Source: "repo", SourceType: "git", SourceURL: "ssh://git@example.com/repo"}, "ssh://git@example.com/repo", true},
+		{"Git protocol", Entry{Source: "repo", SourceType: "git", SourceURL: "git://example.com/repo"}, "git://example.com/repo", true},
+		{"Git local file URL", Entry{Source: "repo", SourceType: "git", SourceURL: "file:///tmp/repo"}, "", false},
+		{"Git URL credentials", Entry{Source: "repo", SourceType: "git", SourceURL: "https://person@example.com/repo.git"}, "", false},
+		{"Git unsupported URL scheme", Entry{Source: "repo", SourceType: "git", SourceURL: "ftp://example.com/repo.git"}, "", false},
+		{"Git URL fragment", Entry{Source: "repo", SourceType: "git", SourceURL: "https://example.com/repo.git#main"}, "", false},
+		{"Git SSH URL without repository", Entry{Source: "repo", SourceType: "git", SourceURL: "ssh://git@example.com"}, "", false},
+		{"Git protocol URL without repository", Entry{Source: "repo", SourceType: "git", SourceURL: "git://example.com"}, "", false},
+		{"Git URL reclassified as well-known", Entry{Source: "repo", SourceType: "git", SourceURL: "https://example.com/repo"}, "", false},
+		{"Git URL reclassified as GitHub", Entry{Source: "repo", SourceType: "git", SourceURL: "https://github.com/org/repo.git"}, "", false},
+		{"Git URL with noncanonical GitHub host", Entry{Source: "repo", SourceType: "git", SourceURL: "https://GitHub.com/org/repo.git"}, "", false},
+		{"Git URL with noncanonical GitLab host", Entry{Source: "repo", SourceType: "git", SourceURL: "https://GitLab.com/org/repo.git"}, "", false},
+		{"Git URL reclassified as hosted artifact", Entry{Source: "repo", SourceType: "git", SourceURL: "https://codeload.github.com/org/repo.git"}, "", false},
+		{"Git URL reclassified as self-hosted GitLab", Entry{Source: "repo", SourceType: "git", SourceURL: "https://example.com/org/repo/-/tree/main.git"}, "", false},
 		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://gitlab.com/org/repo.git"}, "https://gitlab.com/org/repo.git", true},
 		{"GitLab unsupported URL scheme", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "file://gitlab.com/org/repo"}, "", false},
+		{"GitLab URL credentials", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://person@gitlab.com/org/repo"}, "", false},
 		{"well-known base URL", Entry{SourceType: "well-known", SourceURL: "https://wrong.example.com/.well-known/skills/x/SKILL.md", SourceBaseURL: "https://example.com/skills"}, "https://example.com/skills", true},
-		{"well-known URL fallback", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x/SKILL.md"}, "https://example.com", true},
+		{"well-known HTTP base URL with port", Entry{SourceType: "well-known", SourceBaseURL: "http://localhost:8080/scope"}, "http://localhost:8080/scope", true},
+		{"well-known uppercase scheme", Entry{SourceType: "well-known", SourceBaseURL: "HTTP://example.com/scope"}, "", false},
+		{"well-known file base URL", Entry{SourceType: "well-known", SourceBaseURL: "file:///tmp/skill"}, "", false},
+		{"well-known base URL without host", Entry{SourceType: "well-known", SourceBaseURL: "https:///skills"}, "", false},
+		{"well-known base URL credentials", Entry{SourceType: "well-known", SourceBaseURL: "https://person@example.com/skills"}, "", false},
+		{"well-known base URL query", Entry{SourceType: "well-known", SourceBaseURL: "https://example.com/skills?version=1"}, "", false},
+		{"well-known base URL fragment", Entry{SourceType: "well-known", SourceBaseURL: "https://example.com/skills#v1"}, "", false},
+		{"well-known base URL whitespace", Entry{SourceType: "well-known", SourceBaseURL: "https://example.com/path with space"}, "", false},
+		{"well-known base URL backslash", Entry{SourceType: "well-known", SourceBaseURL: `https://example.com/path\scope`}, "", false},
+		{"well-known hosted provider base URL", Entry{SourceType: "well-known", SourceBaseURL: "https://github.com/org/repo"}, "", false},
+		{"well-known GitLab base URL", Entry{SourceType: "well-known", SourceBaseURL: "https://gitlab.com/org/repo"}, "", false},
+		{"well-known raw artifact base URL", Entry{SourceType: "well-known", SourceBaseURL: "https://raw.githubusercontent.com/org/repo/main/SKILL.md"}, "", false},
+		{"well-known codeload artifact base URL", Entry{SourceType: "well-known", SourceBaseURL: "https://codeload.github.com/org/repo/tar.gz/main"}, "", false},
+		{"well-known objects artifact base URL", Entry{SourceType: "well-known", SourceBaseURL: "https://objects.githubusercontent.com/object"}, "", false},
+		{"well-known Hugging Face base URL", Entry{SourceType: "well-known", SourceBaseURL: "https://huggingface.co/org/repo"}, "https://huggingface.co/org/repo", true},
+		{"well-known embedded GitHub source", Entry{SourceType: "well-known", SourceBaseURL: "https://example.com/path/github.com/org/repo"}, "", false},
+		{"well-known embedded GitLab source", Entry{SourceType: "well-known", SourceBaseURL: "https://example.com/path/gitlab.com/org/repo"}, "", false},
+		{"well-known repository base URL", Entry{SourceType: "well-known", SourceBaseURL: "https://example.com/repo.git"}, "", false},
+		{"well-known invalid base does not fall back", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x/SKILL.md", SourceBaseURL: "file:///tmp/skill"}, "", false},
+		{"well-known skills URL fallback", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x/SKILL.md"}, "https://example.com", true},
+		{"well-known hyphenated skill URL fallback", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x-y/SKILL.md"}, "https://example.com", true},
+		{"well-known 64-character skill URL fallback", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/" + strings.Repeat("a", 64) + "/SKILL.md"}, "https://example.com", true},
+		{"well-known agent skills URL fallback with scope", Entry{SourceType: "well-known", SourceURL: "https://example.com:8443/scope/.well-known/agent-skills/x/SKILL.md"}, "https://example.com:8443/scope", true},
+		{"well-known file URL fallback", Entry{SourceType: "well-known", SourceURL: "file:///tmp/.well-known/skills/x/SKILL.md"}, "", false},
+		{"well-known URL fallback credentials", Entry{SourceType: "well-known", SourceURL: "https://person@example.com/.well-known/skills/x/SKILL.md"}, "", false},
+		{"well-known URL fallback query", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x/SKILL.md?version=1"}, "", false},
+		{"well-known URL fallback invalid name", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/Bad_Name/SKILL.md"}, "", false},
+		{"well-known URL fallback leading hyphen", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/-x/SKILL.md"}, "", false},
+		{"well-known URL fallback trailing hyphen", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x-/SKILL.md"}, "", false},
+		{"well-known URL fallback double hyphen", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x--y/SKILL.md"}, "", false},
+		{"well-known URL fallback 65-character name", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/" + strings.Repeat("a", 65) + "/SKILL.md"}, "", false},
+		{"well-known URL fallback embedded GitHub source", Entry{SourceType: "well-known", SourceURL: "https://example.com/path/github.com/org/repo/.well-known/skills/x/SKILL.md"}, "", false},
+		{"well-known URL fallback missing SKILL file", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x"}, "", false},
+		{"well-known URL fallback extra tail", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x/SKILL.md/archive"}, "", false},
 		{"well-known empty URL fallback origin", Entry{SourceType: "well-known", SourceURL: "/.well-known/skills/x/SKILL.md"}, "", false},
 		{"well-known without origin", Entry{SourceType: "well-known", SourceURL: "https://cdn.example.com/x.tgz"}, "", false},
 		{"local", Entry{Source: "/tmp/skill", SourceType: "local"}, "", false},
@@ -176,6 +226,8 @@ func TestMatchesSourceUsesGitHubRepositoryIdentity(t *testing.T) {
 		"ssh://git@github.com:2222/org/repo.git",
 		"https://GITHUB.COM/org/repo",
 		"https://github.com/%6Frg/repo",
+		"https://person@github.com/org/repo",
+		"ssh://git:password@github.com/org/repo.git",
 	} {
 		if entry.MatchesSource(source) {
 			t.Errorf("matched non-equivalent GitHub source %q", source)
@@ -203,6 +255,8 @@ func TestMatchesSourceUsesGitLabRepositoryIdentity(t *testing.T) {
 		"https://gitlab.com:8443/org/group/repo",
 		"https://GITLAB.COM/org/group/repo",
 		"https://gitlab.com/%6Frg/group/repo",
+		"https://person@gitlab.com/org/group/repo",
+		"ssh://git:password@gitlab.com/org/group/repo.git",
 		"git@gitlab.com:org/group/repo.git",
 	} {
 		if entry.MatchesSource(source) {
@@ -218,7 +272,9 @@ func TestMatchesSourceRejectsUnsupportedObservedProviderURLs(t *testing.T) {
 		source string
 	}{
 		{"GitHub", Entry{Source: "file://github.com/org/repo", SourceType: "github"}, "file://github.com/org/repo"},
+		{"GitHub credentials", Entry{Source: "https://person@github.com/org/repo", SourceType: "github"}, "https://person@github.com/org/repo"},
 		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "file://gitlab.com/org/repo"}, "file://gitlab.com/org/repo"},
+		{"GitLab credentials", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://person@gitlab.com/org/repo"}, "https://person@gitlab.com/org/repo"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.entry.MatchesSource(tc.source) {
@@ -235,6 +291,17 @@ func TestMatchesSourceDoesNotNormalizeGenericOrUnrestorableSources(t *testing.T)
 	}
 	if generic.MatchesSource("https://example.com/org/repo") {
 		t.Fatal("generic Git source was normalized")
+	}
+	for _, source := range []string{
+		"file:///tmp/repo",
+		"https://person@example.com/repo.git",
+		"ftp://example.com/repo.git",
+		"https://example.com/repo.git#main",
+		"https://example.com/repo",
+	} {
+		if (Entry{SourceURL: source, SourceType: "git"}).MatchesSource(source) {
+			t.Errorf("matched unrestorable generic Git source %q", source)
+		}
 	}
 	if (Entry{Source: "/tmp/skill", SourceType: "local"}).MatchesSource("/tmp/skill") {
 		t.Fatal("unrestorable local source matched")

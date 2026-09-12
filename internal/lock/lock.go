@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/y-writings/skills-reconcile/internal/envvars"
 )
@@ -116,7 +117,10 @@ func (e Entry) InstallSource() (string, bool) {
 		}
 		return e.Source, true
 	case "git":
-		return e.SourceURL, e.SourceURL != ""
+		if !validGenericGitSource(e.SourceURL) {
+			return "", false
+		}
+		return e.SourceURL, true
 	case "gitlab":
 		if _, ok := gitlabRepository(e.SourceURL); !ok {
 			return "", false
@@ -124,12 +128,12 @@ func (e Entry) InstallSource() (string, bool) {
 		return e.SourceURL, true
 	case "well-known":
 		if e.SourceBaseURL != "" {
+			if _, ok := parseWellKnownURL(e.SourceBaseURL); !ok {
+				return "", false
+			}
 			return e.SourceBaseURL, true
 		}
-		if marker := strings.Index(e.SourceURL, "/.well-known/"); marker > 0 {
-			return e.SourceURL[:marker], true
-		}
-		return "", false
+		return wellKnownBaseURL(e.SourceURL)
 	default:
 		return "", false
 	}
@@ -222,7 +226,159 @@ func plainRepositoryURL(source string, parsed *url.URL, hostname string) bool {
 	return !strings.ContainsAny(source, "?#") &&
 		parsed.Hostname() == hostname &&
 		parsed.Port() == "" &&
+		plainRepositoryUserInfo(parsed) &&
 		parsed.RawPath == "" &&
 		parsed.RawQuery == "" &&
 		parsed.Fragment == ""
+}
+
+func plainRepositoryUserInfo(parsed *url.URL) bool {
+	if parsed.User == nil {
+		return true
+	}
+	if parsed.Scheme != "ssh" || parsed.User.Username() == "" {
+		return false
+	}
+	_, hasPassword := parsed.User.Password()
+	return !hasPassword
+}
+
+func parseWellKnownURL(source string) (*url.URL, bool) {
+	if !portableRemoteSource(source) ||
+		(!strings.HasPrefix(source, "http://") && !strings.HasPrefix(source, "https://")) {
+		return nil, false
+	}
+	parsed, err := url.Parse(source)
+	if err != nil || parsed.Hostname() == "" || parsed.User != nil || strings.HasSuffix(source, ".git") ||
+		reservedWellKnownHost(parsed.Hostname()) || sourceSelectsDifferentProvider(source, parsed) {
+		return nil, false
+	}
+	return parsed, true
+}
+
+func reservedWellKnownHost(hostname string) bool {
+	switch strings.ToLower(hostname) {
+	case "github.com", "gitlab.com", "raw.githubusercontent.com",
+		"codeload.github.com", "objects.githubusercontent.com":
+		return true
+	default:
+		return false
+	}
+}
+
+func validGenericGitSource(source string) bool {
+	if !portableRemoteSource(source) || strings.HasPrefix(source, "github:") ||
+		strings.HasPrefix(source, "gitlab:") {
+		return false
+	}
+
+	parsed, err := url.Parse(source)
+	if err == nil && parsed.Hostname() != "" {
+		if sourceSelectsDifferentProvider(source, parsed) {
+			return false
+		}
+		switch parsed.Scheme {
+		case "http", "https":
+			return parsed.User == nil && strings.HasPrefix(source, parsed.Scheme+"://") &&
+				strings.HasSuffix(source, ".git")
+		case "ssh":
+			return strings.HasPrefix(source, "ssh://") && plainRepositoryUserInfo(parsed) &&
+				nonEmptyRepositoryPath(parsed)
+		case "git":
+			return strings.HasPrefix(source, "git://") && parsed.User == nil && nonEmptyRepositoryPath(parsed)
+		default:
+			return false
+		}
+	}
+	return validSCPGitSource(source)
+}
+
+func nonEmptyRepositoryPath(parsed *url.URL) bool {
+	return strings.Trim(parsed.EscapedPath(), "/") != ""
+}
+
+func validSCPGitSource(source string) bool {
+	if strings.Contains(source, "://") {
+		return false
+	}
+	separator := strings.IndexByte(source, ':')
+	if separator <= 0 || separator == len(source)-1 {
+		return false
+	}
+	authority := source[:separator]
+	if strings.ContainsAny(authority, `/\`) || strings.Count(authority, "@") > 1 {
+		return false
+	}
+	hostname := authority
+	if at := strings.LastIndexByte(authority, '@'); at >= 0 {
+		hostname = authority[at+1:]
+	}
+	return hostname != ""
+}
+
+func portableRemoteSource(source string) bool {
+	if source == "" || source != strings.TrimSpace(source) ||
+		strings.IndexFunc(source, unicode.IsSpace) >= 0 || strings.ContainsAny(source, `?#\`) ||
+		source == "." || source == ".." || filepath.IsAbs(source) ||
+		strings.HasPrefix(source, "./") || strings.HasPrefix(source, "../") ||
+		strings.HasPrefix(source, "~/") || strings.HasPrefix(strings.ToLower(source), "file:") ||
+		windowsAbsoluteSource(source) {
+		return false
+	}
+	parsed, err := url.Parse(source)
+	if err != nil || parsed.User == nil {
+		return true
+	}
+	_, hasPassword := parsed.User.Password()
+	return !hasPassword && parsed.Scheme != "http" && parsed.Scheme != "https"
+}
+
+func windowsAbsoluteSource(source string) bool {
+	return len(source) >= 3 && ((source[0] >= 'a' && source[0] <= 'z') ||
+		(source[0] >= 'A' && source[0] <= 'Z')) && source[1] == ':' && source[2] == '/'
+}
+
+func sourceSelectsDifferentProvider(source string, parsed *url.URL) bool {
+	switch strings.ToLower(parsed.Hostname()) {
+	case "github.com", "gitlab.com", "raw.githubusercontent.com", "codeload.github.com",
+		"objects.githubusercontent.com":
+		return true
+	}
+	return strings.Contains(source, "github.com/") || strings.Contains(source, "gitlab.com/") ||
+		((parsed.Scheme == "http" || parsed.Scheme == "https") && strings.Contains(parsed.Path, "/-/tree/"))
+}
+
+func wellKnownBaseURL(sourceURL string) (string, bool) {
+	parsed, ok := parseWellKnownURL(sourceURL)
+	if !ok {
+		return "", false
+	}
+
+	path := parsed.EscapedPath()
+	for _, marker := range []string{"/.well-known/agent-skills/", "/.well-known/skills/"} {
+		markerIndex := strings.LastIndex(path, marker)
+		if markerIndex < 0 || !validWellKnownSkillPath(path[markerIndex+len(marker):]) {
+			continue
+		}
+		return parsed.Scheme + "://" + parsed.Host + path[:markerIndex], true
+	}
+	return "", false
+}
+
+func validWellKnownSkillPath(path string) bool {
+	name, skillFile, found := strings.Cut(path, "/")
+	return found && skillFile == "SKILL.md" && validWellKnownSkillName(name)
+}
+
+func validWellKnownSkillName(name string) bool {
+	if len(name) == 0 || len(name) > 64 || name[0] == '-' || name[len(name)-1] == '-' ||
+		strings.Contains(name, "--") {
+		return false
+	}
+	for _, character := range name {
+		if (character < 'a' || character > 'z') && (character < '0' || character > '9') && character != '-' {
+			return false
+		}
+	}
+	return true
 }
