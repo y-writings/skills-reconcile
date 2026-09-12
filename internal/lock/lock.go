@@ -348,6 +348,9 @@ func validGenericGitSource(source string) bool {
 			return false
 		}
 	}
+	if sourceHasHostedProviderMarker(source) {
+		return false
+	}
 	return validSCPGitSource(source)
 }
 
@@ -419,8 +422,12 @@ func sourceSelectsDifferentProvider(source string, parsed *url.URL) bool {
 		"objects.githubusercontent.com":
 		return true
 	}
-	return strings.Contains(source, "github.com/") || strings.Contains(source, "gitlab.com/") ||
+	return sourceHasHostedProviderMarker(source) ||
 		((parsed.Scheme == "http" || parsed.Scheme == "https") && strings.Contains(parsed.Path, "/-/tree/"))
+}
+
+func sourceHasHostedProviderMarker(source string) bool {
+	return strings.Contains(source, "github.com/") || strings.Contains(source, "gitlab.com/")
 }
 
 func wellKnownBaseURL(sourceURL string) (string, bool) {
