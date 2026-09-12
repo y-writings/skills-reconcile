@@ -12,10 +12,9 @@ import (
 	"github.com/y-writings/skills-reconcile/internal/envvars"
 )
 
-// Overrides supplies optional paths that take precedence over configured defaults.
+// Overrides supplies an optional workspace directory that takes precedence over configured defaults.
 type Overrides struct {
-	WorkspacePath string
-	ManifestPath  string
+	WorkspaceDir string
 }
 
 // Location contains the resolved workspace directory and manifest path.
@@ -26,82 +25,84 @@ type Location struct {
 	ManifestPath string
 }
 
-// Resolve determines workspace and manifest paths from explicit overrides
+// Resolve determines the workspace and its manifest path from an explicit override
 // and configured defaults, falling back to the current directory.
 func Resolve(overrides Overrides) (Location, error) {
-	if overrides.ManifestPath != "" {
-		path, err := filepath.Abs(overrides.ManifestPath)
-		if err != nil {
-			return Location{}, err
-		}
-		root, err := resolveDirectory(filepath.Dir(path))
-		if err != nil {
-			return Location{}, err
-		}
-		return Location{WorkspaceDir: root, ManifestPath: filepath.Join(root, filepath.Base(path))}, nil
-	}
-	root, err := selectWorkspace(overrides.WorkspacePath)
+	selectedDir, err := selectWorkspaceDir(overrides.WorkspaceDir)
 	if err != nil {
 		return Location{}, err
 	}
-	if !filepath.IsAbs(root) {
-		return Location{}, errors.New("configured workspace must be absolute")
-	}
-	root = filepath.Clean(root)
-	root, err = resolveDirectory(root)
+	workspaceDir, err := resolveWorkspaceDir(selectedDir)
 	if err != nil {
 		return Location{}, fmt.Errorf("resolve workspace: %w", err)
 	}
-	return Location{WorkspaceDir: root, ManifestPath: filepath.Join(root, "skills-manifest.json")}, nil
+	return Location{WorkspaceDir: workspaceDir, ManifestPath: filepath.Join(workspaceDir, "skills-manifest.json")}, nil
 }
 
-func resolveDirectory(path string) (string, error) {
-	root, err := filepath.EvalSymlinks(path)
+func resolveWorkspaceDir(selectedDir string) (string, error) {
+	workspaceDir, err := filepath.EvalSymlinks(selectedDir)
 	if err != nil {
 		return "", err
 	}
-	info, err := os.Stat(root)
+	info, err := os.Stat(workspaceDir)
 	if err != nil {
 		return "", err
 	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("workspace must be a directory: %s", root)
+		return "", fmt.Errorf("workspace must be a directory: %s", workspaceDir)
 	}
-	return root, nil
+	return workspaceDir, nil
 }
 
-func selectWorkspace(explicitWorkspacePath string) (string, error) {
-	if explicitWorkspacePath != "" {
-		return explicitWorkspacePath, nil
+func selectWorkspaceDir(explicitWorkspaceDir string) (string, error) {
+	if explicitWorkspaceDir != "" {
+		return requireAbsoluteWorkspaceDir(explicitWorkspaceDir)
 	}
-	if root := os.Getenv(envvars.Workspace); root != "" {
-		return root, nil
+
+	if environmentWorkspaceDir := os.Getenv(envvars.Workspace); environmentWorkspaceDir != "" {
+		return requireAbsoluteWorkspaceDir(environmentWorkspaceDir)
 	}
-	root, err := workspaceFromConfig()
-	if err != nil || root != "" {
-		return root, err
+
+	configuredWorkspaceDir, found, err := lookupWorkspaceDirFromConfig()
+	if err != nil {
+		return "", err
 	}
-	return os.Getwd()
+	if found {
+		return requireAbsoluteWorkspaceDir(configuredWorkspaceDir)
+	}
+
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return requireAbsoluteWorkspaceDir(currentDir)
 }
 
-func workspaceFromConfig() (string, error) {
+func requireAbsoluteWorkspaceDir(workspaceDir string) (string, error) {
+	if !filepath.IsAbs(workspaceDir) {
+		return "", errors.New("configured workspace must be absolute")
+	}
+	return workspaceDir, nil
+}
+
+func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error) {
 	configHome := os.Getenv(envvars.XDGConfigHome)
 	if configHome == "" {
 		home := os.Getenv(envvars.Home)
 		if home == "" {
-			return "", nil
+			return "", false, nil
 		}
 		configHome = filepath.Join(home, ".config")
 	}
 	if !filepath.IsAbs(configHome) {
-		return "", errors.New("config directory must be absolute")
+		return "", false, errors.New("config directory must be absolute")
 	}
 	data, err := os.ReadFile(filepath.Join(configHome, "skills-reconcile", "config.json"))
 	if errors.Is(err, os.ErrNotExist) {
-		return "", nil
+		return "", false, nil
 	}
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	var config struct {
 		Workspace string `json:"workspace"`
@@ -110,7 +111,10 @@ func workspaceFromConfig() (string, error) {
 	decoder.DisallowUnknownFields()
 	var trailing any
 	if decoder.Decode(&config) != nil || decoder.Decode(&trailing) != io.EOF {
-		return "", errors.New("invalid skills-reconcile config")
+		return "", false, errors.New("invalid skills-reconcile config")
 	}
-	return config.Workspace, nil
+	if config.Workspace == "" {
+		return "", false, nil
+	}
+	return config.Workspace, true, nil
 }

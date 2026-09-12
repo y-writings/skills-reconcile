@@ -30,7 +30,7 @@ func TestResolveWorkspacePrecedence(t *testing.T) {
 				writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(`{"workspace":%q}`, paths[tc.config]))
 			}
 
-			location, err := Resolve(Overrides{WorkspacePath: paths[tc.flag]})
+			location, err := Resolve(Overrides{WorkspaceDir: paths[tc.flag]})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -88,10 +88,8 @@ func TestResolveExplicitSelectionDoesNotReadLowerPriorityConfig(t *testing.T) {
 	}{
 		{"flag", "flag", false},
 		{"environment", "environment", false},
-		{"manifest", "manifest", false},
 		{"flag with relative config", "flag", true},
 		{"environment with relative config", "environment", true},
-		{"manifest with relative config", "manifest", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			base := isolateResolve(t)
@@ -100,16 +98,14 @@ func TestResolveExplicitSelectionDoesNotReadLowerPriorityConfig(t *testing.T) {
 				t.Setenv("HOME", "relative-home")
 			}
 			writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), `{broken`)
-			var flag, manifest string
+			var flag string
 			switch tc.selector {
 			case "flag":
 				flag = base
 			case "environment":
 				t.Setenv("SKILLS_RECONCILE_WORKSPACE", base)
-			case "manifest":
-				manifest = filepath.Join(base, "skills-manifest.json")
 			}
-			if location, err := Resolve(Overrides{WorkspacePath: flag, ManifestPath: manifest}); err != nil || location.WorkspaceDir != base {
+			if location, err := Resolve(Overrides{WorkspaceDir: flag}); err != nil || location.WorkspaceDir != base {
 				t.Fatalf("selected workspace = %q, error = %v; want %q without reading config", location.WorkspaceDir, err, base)
 			}
 		})
@@ -176,7 +172,7 @@ func TestResolveRejectsRelativeWorkspaceWithoutFallback(t *testing.T) {
 			case "config":
 				writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), `{"workspace":"relative"}`)
 			}
-			location, err := Resolve(Overrides{WorkspacePath: flag})
+			location, err := Resolve(Overrides{WorkspaceDir: flag})
 			if err == nil || !strings.Contains(err.Error(), "configured workspace must be absolute") || location != (Location{}) {
 				t.Fatalf("relative %s resolved (%q, %q), error = %v; want absolute-path rejection", selector, location.WorkspaceDir, location.ManifestPath, err)
 			}
@@ -245,7 +241,7 @@ func TestResolveCanonicalizesWorkspaceWithoutReadingOrCreatingManifest(t *testin
 				t.Fatal(err)
 			}
 		}
-		location, err := Resolve(Overrides{WorkspacePath: link + "/./"})
+		location, err := Resolve(Overrides{WorkspaceDir: link + "/./"})
 		if err != nil || location.WorkspaceDir != target || location.ManifestPath != manifestPath {
 			t.Fatalf("resolved (%q, %q), error = %v; want (%q, %q)", location.WorkspaceDir, location.ManifestPath, err, target, manifestPath)
 		}
@@ -260,23 +256,19 @@ func TestResolveCanonicalizesWorkspaceWithoutReadingOrCreatingManifest(t *testin
 	}
 }
 
-func TestResolveExplicitManifestOverridesWorkspaceAndResolvesOnlyParent(t *testing.T) {
+func TestResolvePreservesSymlinkAwareParentTraversal(t *testing.T) {
 	base := isolateResolve(t)
 	parent := filepath.Join(base, "parent")
-	makeDir(t, parent)
-	if err := os.Symlink(parent, filepath.Join(base, "alias")); err != nil {
+	target := filepath.Join(parent, "target")
+	makeDir(t, target)
+	link := filepath.Join(base, "link")
+	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-	// A dangling manifest symlink must not be followed by the locator.
-	if err := os.Symlink("missing.json", filepath.Join(parent, "inventory.json")); err != nil {
-		t.Fatal(err)
-	}
-	for _, path := range []string{"alias/inventory.json", filepath.Join(base, "alias", "inventory.json")} {
-		location, err := Resolve(Overrides{WorkspacePath: "invalid-relative-workspace", ManifestPath: path})
-		want := filepath.Join(parent, "inventory.json")
-		if err != nil || location.WorkspaceDir != parent || location.ManifestPath != want {
-			t.Fatalf("manifest %q resolved (%q, %q), error = %v; want (%q, %q)", path, location.WorkspaceDir, location.ManifestPath, err, parent, want)
-		}
+
+	location, err := Resolve(Overrides{WorkspaceDir: link + string(filepath.Separator) + ".."})
+	if err != nil || location.WorkspaceDir != parent {
+		t.Fatalf("workspace = %q, error = %v; want symlink-aware parent %q", location.WorkspaceDir, err, parent)
 	}
 }
 
@@ -288,9 +280,7 @@ func TestResolveRejectsNonDirectoryWithoutFallback(t *testing.T) {
 		{"workspace file", "workspace", false},
 		{"environment file", "environment", false},
 		{"config file", "config", false},
-		{"manifest parent file", "manifest", false},
 		{"workspace file symlink", "workspace", true},
-		{"manifest parent file symlink", "manifest", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			base := isolateResolve(t)
@@ -309,15 +299,12 @@ func TestResolveRejectsNonDirectoryWithoutFallback(t *testing.T) {
 			var overrides Overrides
 			switch tc.selector {
 			case "workspace":
-				overrides.WorkspacePath = path
+				overrides.WorkspaceDir = path
 				t.Setenv("SKILLS_RECONCILE_WORKSPACE", base)
 			case "environment":
 				t.Setenv("SKILLS_RECONCILE_WORKSPACE", path)
 			case "config":
 				writeConfig(t, os.Getenv("XDG_CONFIG_HOME"), fmt.Sprintf(`{"workspace":%q}`, path))
-			case "manifest":
-				overrides.ManifestPath = filepath.Join(path, "inventory.json")
-				overrides.WorkspacePath = base
 			}
 			location, err := Resolve(overrides)
 			if err == nil || !strings.Contains(err.Error(), "workspace must be a directory") || location != (Location{}) {
@@ -327,22 +314,15 @@ func TestResolveRejectsNonDirectoryWithoutFallback(t *testing.T) {
 	}
 }
 
-func TestResolveRejectsMissingWorkspaceOrManifestParent(t *testing.T) {
+func TestResolveRejectsMissingWorkspace(t *testing.T) {
 	base := isolateResolve(t)
 	missing := filepath.Join(base, "missing")
-	for _, tc := range []struct{ name, flag, manifest string }{
-		{"workspace", missing, ""},
-		{"manifest parent", "", filepath.Join(missing, "inventory.json")},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			location, err := Resolve(Overrides{WorkspacePath: tc.flag, ManifestPath: tc.manifest})
-			if !errors.Is(err, os.ErrNotExist) || location != (Location{}) {
-				t.Fatalf("missing %s resolved (%q, %q), error = %v", tc.name, location.WorkspaceDir, location.ManifestPath, err)
-			}
-			if _, err := os.Stat(missing); !errors.Is(err, os.ErrNotExist) {
-				t.Fatalf("resolver created missing directory: %v", err)
-			}
-		})
+	location, err := Resolve(Overrides{WorkspaceDir: missing})
+	if !errors.Is(err, os.ErrNotExist) || location != (Location{}) {
+		t.Fatalf("missing workspace resolved (%q, %q), error = %v", location.WorkspaceDir, location.ManifestPath, err)
+	}
+	if _, err := os.Stat(missing); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("resolver created missing directory: %v", err)
 	}
 }
 
