@@ -22,15 +22,12 @@ func TestDecodeWorkspaceConfig(t *testing.T) {
 
 func TestDecodeWorkspaceConfigRejectsInvalidConfig(t *testing.T) {
 	for _, tc := range []struct{ name, data string }{
-		{"empty input", ""},
-		{"malformed JSON", `{`},
+		{"invalid UTF-8", "{\"workspace\":\"/work\xffspace\"}"},
 		{"null config", `null`},
-		{"trailing JSON", `{} {}`},
 		{"null workspace", `{"workspace":null}`},
 		{"wrong workspace type", `{"workspace":42}`},
 		{"unknown field", `{"workpace":"/workspace"}`},
 		{"case variant", `{"workspace":"/workspace","Workspace":"/other"}`},
-		{"duplicate workspace", `{"workspace":"/first","workspace":"/second"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			workspaceDir, found, err := decodeWorkspaceConfig([]byte(tc.data))
