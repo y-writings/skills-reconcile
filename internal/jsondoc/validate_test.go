@@ -1,6 +1,9 @@
 package jsondoc
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateAcceptsOneUnambiguousJSONValue(t *testing.T) {
 	for _, tc := range []struct {
@@ -53,6 +56,28 @@ func TestValidateRejectsDuplicateObjectFields(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := Validate(tc.data); err == nil {
 				t.Fatal("Validate() error = nil, want duplicate-field rejection")
+			}
+		})
+	}
+}
+
+func TestValidateAppliesJSONNestingLimit(t *testing.T) {
+	const standardJSONMaxNestingDepth = 10_000
+
+	for _, tc := range []struct {
+		name    string
+		data    string
+		wantErr bool
+	}{
+		{"array at limit", strings.Repeat(`[`, standardJSONMaxNestingDepth) + strings.Repeat(`]`, standardJSONMaxNestingDepth), false},
+		{"array beyond limit", strings.Repeat(`[`, standardJSONMaxNestingDepth+1) + strings.Repeat(`]`, standardJSONMaxNestingDepth+1), true},
+		{"object at limit", strings.Repeat(`{"x":`, standardJSONMaxNestingDepth) + `0` + strings.Repeat(`}`, standardJSONMaxNestingDepth), false},
+		{"object beyond limit", strings.Repeat(`{"x":`, standardJSONMaxNestingDepth+1) + `0` + strings.Repeat(`}`, standardJSONMaxNestingDepth+1), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Validate([]byte(tc.data))
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %t", err, tc.wantErr)
 			}
 		})
 	}
