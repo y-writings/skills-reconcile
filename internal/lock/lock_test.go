@@ -132,8 +132,10 @@ func TestInstallSourceSupportsOnlyRestorableSources(t *testing.T) {
 		ok    bool
 	}{
 		{"GitHub", Entry{Source: "org/repo", SourceType: "github"}, "org/repo", true},
+		{"GitHub unsupported URL scheme", Entry{Source: "file://github.com/org/repo", SourceType: "github"}, "", false},
 		{"Git", Entry{Source: "repo", SourceType: "git", SourceURL: "git@example.com:repo.git"}, "git@example.com:repo.git", true},
 		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://gitlab.com/org/repo.git"}, "https://gitlab.com/org/repo.git", true},
+		{"GitLab unsupported URL scheme", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "file://gitlab.com/org/repo"}, "", false},
 		{"well-known base URL", Entry{SourceType: "well-known", SourceURL: "https://wrong.example.com/.well-known/skills/x/SKILL.md", SourceBaseURL: "https://example.com/skills"}, "https://example.com/skills", true},
 		{"well-known URL fallback", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x/SKILL.md"}, "https://example.com", true},
 		{"well-known empty URL fallback origin", Entry{SourceType: "well-known", SourceURL: "/.well-known/skills/x/SKILL.md"}, "", false},
@@ -156,6 +158,7 @@ func TestMatchesSourceUsesGitHubRepositoryIdentity(t *testing.T) {
 	for _, source := range []string{
 		"org/repo",
 		"github:org/repo",
+		"http://github.com/org/repo/",
 		"https://github.com/org/repo.git",
 		"git@github.com:org/repo.git",
 		"ssh://git@github.com/org/repo.git",
@@ -166,6 +169,8 @@ func TestMatchesSourceUsesGitHubRepositoryIdentity(t *testing.T) {
 	}
 	for _, source := range []string{
 		"other/repo",
+		"file://github.com/org/repo",
+		"//github.com/org/repo",
 		"https://github.com/org/repo?mirror=other",
 		"https://github.com/org/repo#v1",
 		"ssh://git@github.com:2222/org/repo.git",
@@ -193,6 +198,8 @@ func TestMatchesSourceUsesGitLabRepositoryIdentity(t *testing.T) {
 	}
 	for _, source := range []string{
 		"https://gitlab.com/other/group/repo",
+		"file://gitlab.com/org/group/repo",
+		"//gitlab.com/org/group/repo",
 		"https://gitlab.com:8443/org/group/repo",
 		"https://GITLAB.COM/org/group/repo",
 		"https://gitlab.com/%6Frg/group/repo",
@@ -201,6 +208,23 @@ func TestMatchesSourceUsesGitLabRepositoryIdentity(t *testing.T) {
 		if entry.MatchesSource(source) {
 			t.Errorf("matched non-equivalent GitLab source %q", source)
 		}
+	}
+}
+
+func TestMatchesSourceRejectsUnsupportedObservedProviderURLs(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		entry  Entry
+		source string
+	}{
+		{"GitHub", Entry{Source: "file://github.com/org/repo", SourceType: "github"}, "file://github.com/org/repo"},
+		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "file://gitlab.com/org/repo"}, "file://gitlab.com/org/repo"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.entry.MatchesSource(tc.source) {
+				t.Fatalf("matched unsupported provider URL %q", tc.source)
+			}
+		})
 	}
 }
 

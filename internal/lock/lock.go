@@ -111,9 +111,17 @@ func ReadObserved(path string) (*Lock, error) {
 func (e Entry) InstallSource() (string, bool) {
 	switch e.SourceType {
 	case "github":
-		return e.Source, e.Source != ""
-	case "git", "gitlab":
+		if _, ok := githubRepository(e.Source); !ok {
+			return "", false
+		}
+		return e.Source, true
+	case "git":
 		return e.SourceURL, e.SourceURL != ""
+	case "gitlab":
+		if _, ok := gitlabRepository(e.SourceURL); !ok {
+			return "", false
+		}
+		return e.SourceURL, true
 	case "well-known":
 		if e.SourceBaseURL != "" {
 			return e.SourceBaseURL, true
@@ -157,7 +165,8 @@ func githubRepository(source string) (string, bool) {
 		repository = strings.TrimPrefix(source, "github:")
 	} else if strings.HasPrefix(source, "git@github.com:") {
 		repository = strings.TrimPrefix(source, "git@github.com:")
-	} else if parsed, err := url.Parse(source); err == nil && plainRepositoryURL(source, parsed, "github.com") {
+	} else if parsed, err := url.Parse(source); err == nil &&
+		supportedRepositoryURLScheme(parsed.Scheme) && plainRepositoryURL(source, parsed, "github.com") {
 		repository = strings.TrimPrefix(parsed.Path, "/")
 	} else if strings.Count(source, "/") != 1 || strings.Contains(source, ":") {
 		return "", false
@@ -183,9 +192,7 @@ func gitlabRepository(source string) (string, bool) {
 		if err != nil {
 			return "", false
 		}
-		switch parsed.Scheme {
-		case "http", "https", "ssh":
-		default:
+		if !supportedRepositoryURLScheme(parsed.Scheme) {
 			return "", false
 		}
 		if !plainRepositoryURL(source, parsed, "gitlab.com") {
@@ -205,6 +212,10 @@ func gitlabRepository(source string) (string, bool) {
 		}
 	}
 	return "gitlab.com/" + repository, true
+}
+
+func supportedRepositoryURLScheme(scheme string) bool {
+	return scheme == "http" || scheme == "https" || scheme == "ssh"
 }
 
 func plainRepositoryURL(source string, parsed *url.URL, hostname string) bool {
