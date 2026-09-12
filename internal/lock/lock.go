@@ -275,7 +275,6 @@ func githubRepository(source string) (string, bool) {
 	if strings.ContainsAny(repository, "@:") {
 		return "", false
 	}
-
 	repository = strings.TrimSuffix(strings.TrimSuffix(repository, "/"), ".git")
 	parts := strings.Split(repository, "/")
 	if len(parts) != 2 || !validHostedRepositoryPart(parts[0]) || !validHostedRepositoryPart(parts[1]) {
@@ -296,18 +295,12 @@ func gitlabRepository(source string) (string, bool) {
 		repository = strings.TrimPrefix(source, "gitlab.com/")
 	default:
 		parsed, err := url.Parse(source)
-		if err != nil {
-			return "", false
-		}
-		if !supportedRepositoryURLScheme(parsed.Scheme) {
-			return "", false
-		}
-		if !plainRepositoryURL(source, parsed, "gitlab.com") {
+		if err != nil || !supportedRepositoryURLScheme(parsed.Scheme) ||
+			!plainRepositoryURL(source, parsed, "gitlab.com") {
 			return "", false
 		}
 		repository = strings.TrimPrefix(parsed.Path, "/")
 	}
-
 	repository = strings.TrimSuffix(strings.TrimSuffix(repository, "/"), ".git")
 	parts := strings.Split(repository, "/")
 	if len(parts) < 2 {
@@ -330,7 +323,6 @@ func validHostedRepositoryPart(part string) bool {
 func supportedRepositoryURLScheme(scheme string) bool {
 	return scheme == "http" || scheme == "https" || scheme == "ssh"
 }
-
 func plainRepositoryURL(source string, parsed *url.URL, hostname string) bool {
 	return !strings.ContainsAny(source, "?#") &&
 		parsed.Hostname() == hostname &&
@@ -340,18 +332,16 @@ func plainRepositoryURL(source string, parsed *url.URL, hostname string) bool {
 		parsed.RawQuery == "" &&
 		parsed.Fragment == ""
 }
-
 func plainRepositoryUserInfo(parsed *url.URL) bool {
 	if parsed.User == nil {
 		return true
 	}
-	if parsed.Scheme != "ssh" || parsed.User.Username() == "" {
+	if parsed.Scheme != "ssh" || parsed.User.Username() == "" || strings.HasPrefix(parsed.User.Username(), "-") {
 		return false
 	}
 	_, hasPassword := parsed.User.Password()
 	return !hasPassword
 }
-
 func parseWellKnownURL(source string) (*url.URL, bool) {
 	if !portableRemoteSource(source) ||
 		(!strings.HasPrefix(source, "http://") && !strings.HasPrefix(source, "https://")) {
@@ -380,7 +370,6 @@ func validGenericGitSource(source string) bool {
 		strings.HasPrefix(source, "gitlab:") {
 		return false
 	}
-
 	parsed, err := url.Parse(source)
 	if err == nil && parsed.Hostname() != "" {
 		if sourceSelectsDifferentProvider(source, parsed) {
@@ -391,7 +380,7 @@ func validGenericGitSource(source string) bool {
 			return parsed.User == nil && strings.HasPrefix(source, parsed.Scheme+"://") &&
 				strings.HasSuffix(source, ".git")
 		case "ssh":
-			return strings.HasPrefix(source, "ssh://") && plainRepositoryUserInfo(parsed) &&
+			return strings.HasPrefix(source, "ssh://") && !strings.HasPrefix(parsed.Hostname(), "-") && plainRepositoryUserInfo(parsed) &&
 				nonEmptyRepositoryPath(parsed)
 		case "git":
 			return strings.HasPrefix(source, "git://") && parsed.User == nil && nonEmptyRepositoryPath(parsed)
@@ -405,24 +394,35 @@ func validGenericGitSource(source string) bool {
 func nonEmptyRepositoryPath(parsed *url.URL) bool {
 	return strings.Trim(parsed.Path, "/") != ""
 }
-
 func validSCPGitSource(source string) bool {
 	if strings.Contains(source, "://") {
 		return false
 	}
 	separator := strings.IndexByte(source, ':')
-	if separator <= 0 || strings.Trim(source[separator+1:], "/") == "" {
+	bracketStart := strings.Index(source, "@[") + 1
+	if bracketStart <= separator && source[bracketStart] == '[' {
+		close := bracketStart + strings.IndexByte(source[bracketStart:], ']')
+		if close >= bracketStart {
+			separator = strings.IndexByte(source[close+1:], ':')
+			if separator >= 0 {
+				separator += close + 1
+			}
+		}
+	}
+	if separator <= 0 || strings.Trim(source[separator+1:], "/") == "" || strings.HasPrefix(source[separator+1:], "-") || strings.HasPrefix(source[separator+1:], ":") {
 		return false
 	}
 	authority := source[:separator]
 	if strings.ContainsAny(authority, `/\`) || strings.Count(authority, "@") > 1 {
 		return false
 	}
-	hostname := authority
-	if at := strings.LastIndexByte(authority, '@'); at >= 0 {
-		hostname = authority[at+1:]
+	hostname := authority[strings.LastIndexByte(authority, '@')+1:]
+	effectiveHostname := hostname
+	if unwrapped, _, bracketed := strings.Cut(strings.TrimPrefix(hostname, "["), "]"); bracketed && strings.HasPrefix(hostname, "[") {
+		effectiveHostname = unwrapped
 	}
-	return hostname != ""
+	optionLikeHostname := strings.HasPrefix(authority, "-") || strings.HasPrefix(effectiveHostname, "-")
+	return effectiveHostname != "" && !strings.HasPrefix(authority, "@") && !optionLikeHostname && !reservedWellKnownHost(effectiveHostname)
 }
 
 func portableRemoteSource(source string) bool {
