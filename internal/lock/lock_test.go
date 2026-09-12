@@ -136,6 +136,7 @@ func TestInstallSourceSupportsOnlyRestorableSources(t *testing.T) {
 		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://gitlab.com/org/repo.git"}, "https://gitlab.com/org/repo.git", true},
 		{"well-known base URL", Entry{SourceType: "well-known", SourceURL: "https://wrong.example.com/.well-known/skills/x/SKILL.md", SourceBaseURL: "https://example.com/skills"}, "https://example.com/skills", true},
 		{"well-known URL fallback", Entry{SourceType: "well-known", SourceURL: "https://example.com/.well-known/skills/x/SKILL.md"}, "https://example.com", true},
+		{"well-known empty URL fallback origin", Entry{SourceType: "well-known", SourceURL: "/.well-known/skills/x/SKILL.md"}, "", false},
 		{"well-known without origin", Entry{SourceType: "well-known", SourceURL: "https://cdn.example.com/x.tgz"}, "", false},
 		{"local", Entry{Source: "/tmp/skill", SourceType: "local"}, "", false},
 		{"node modules", Entry{Source: "pkg", SourceType: "node_modules"}, "", false},

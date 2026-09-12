@@ -118,7 +118,7 @@ func (e Entry) InstallSource() (string, bool) {
 		if e.SourceBaseURL != "" {
 			return e.SourceBaseURL, true
 		}
-		if marker := strings.Index(e.SourceURL, "/.well-known/"); marker >= 0 {
+		if marker := strings.Index(e.SourceURL, "/.well-known/"); marker > 0 {
 			return e.SourceURL[:marker], true
 		}
 		return "", false
