@@ -132,9 +132,12 @@ func TestInstallSourceSupportsOnlyRestorableSources(t *testing.T) {
 		ok    bool
 	}{
 		{"GitHub", Entry{Source: "org/repo", SourceType: "github"}, "org/repo", true},
+		{"GitHub NUL control character", Entry{Source: "org/repo\x00", SourceType: "github"}, "", false},
 		{"GitHub unsupported URL scheme", Entry{Source: "file://github.com/org/repo", SourceType: "github"}, "", false},
 		{"GitHub URL credentials", Entry{Source: "https://person@github.com/org/repo", SourceType: "github"}, "", false},
 		{"Git", Entry{Source: "repo", SourceType: "git", SourceURL: "git@example.com:repo.git"}, "git@example.com:repo.git", true},
+		{"Git SCP NUL control character", Entry{Source: "repo", SourceType: "git", SourceURL: "git@example.com:repo.git\x00"}, "", false},
+		{"Git SCP authority control character", Entry{Source: "repo", SourceType: "git", SourceURL: "git\x1b@example.com:repo.git"}, "", false},
 		{"Git HTTPS", Entry{Source: "repo", SourceType: "git", SourceURL: "https://example.com/repo.git"}, "https://example.com/repo.git", true},
 		{"Git SSH", Entry{Source: "repo", SourceType: "git", SourceURL: "ssh://git@example.com/repo"}, "ssh://git@example.com/repo", true},
 		{"Git protocol", Entry{Source: "repo", SourceType: "git", SourceURL: "git://example.com/repo"}, "git://example.com/repo", true},
@@ -151,9 +154,11 @@ func TestInstallSourceSupportsOnlyRestorableSources(t *testing.T) {
 		{"Git URL reclassified as hosted artifact", Entry{Source: "repo", SourceType: "git", SourceURL: "https://codeload.github.com/org/repo.git"}, "", false},
 		{"Git URL reclassified as self-hosted GitLab", Entry{Source: "repo", SourceType: "git", SourceURL: "https://example.com/org/repo/-/tree/main.git"}, "", false},
 		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://gitlab.com/org/repo.git"}, "https://gitlab.com/org/repo.git", true},
+		{"GitLab control character", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "gitlab:org/repo\x1b"}, "", false},
 		{"GitLab unsupported URL scheme", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "file://gitlab.com/org/repo"}, "", false},
 		{"GitLab URL credentials", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://person@gitlab.com/org/repo"}, "", false},
 		{"well-known base URL", Entry{SourceType: "well-known", SourceURL: "https://wrong.example.com/.well-known/skills/x/SKILL.md", SourceBaseURL: "https://example.com/skills"}, "https://example.com/skills", true},
+		{"well-known base URL control character", Entry{SourceType: "well-known", SourceBaseURL: "https://example.com/skills\u0080"}, "", false},
 		{"well-known HTTP base URL with port", Entry{SourceType: "well-known", SourceBaseURL: "http://localhost:8080/scope"}, "http://localhost:8080/scope", true},
 		{"well-known uppercase scheme", Entry{SourceType: "well-known", SourceBaseURL: "HTTP://example.com/scope"}, "", false},
 		{"well-known file base URL", Entry{SourceType: "well-known", SourceBaseURL: "file:///tmp/skill"}, "", false},
@@ -272,8 +277,10 @@ func TestMatchesSourceRejectsUnsupportedObservedProviderURLs(t *testing.T) {
 		source string
 	}{
 		{"GitHub", Entry{Source: "file://github.com/org/repo", SourceType: "github"}, "file://github.com/org/repo"},
+		{"GitHub control character", Entry{Source: "org/repo\x00", SourceType: "github"}, "org/repo\x00"},
 		{"GitHub credentials", Entry{Source: "https://person@github.com/org/repo", SourceType: "github"}, "https://person@github.com/org/repo"},
 		{"GitLab", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "file://gitlab.com/org/repo"}, "file://gitlab.com/org/repo"},
+		{"GitLab control character", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "gitlab:org/repo\x1b"}, "gitlab:org/repo\x1b"},
 		{"GitLab credentials", Entry{Source: "repo", SourceType: "gitlab", SourceURL: "https://person@gitlab.com/org/repo"}, "https://person@gitlab.com/org/repo"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -298,6 +305,7 @@ func TestMatchesSourceDoesNotNormalizeGenericOrUnrestorableSources(t *testing.T)
 		"ftp://example.com/repo.git",
 		"https://example.com/repo.git#main",
 		"https://example.com/repo",
+		"git@example.com:repo.git\x00",
 	} {
 		if (Entry{SourceURL: source, SourceType: "git"}).MatchesSource(source) {
 			t.Errorf("matched unrestorable generic Git source %q", source)

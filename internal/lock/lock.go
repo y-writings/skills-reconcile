@@ -164,6 +164,9 @@ func (e Entry) MatchesSource(source string) bool {
 }
 
 func githubRepository(source string) (string, bool) {
+	if hasUnsafeSourceRune(source) {
+		return "", false
+	}
 	repository := source
 	if strings.HasPrefix(source, "github:") {
 		repository = strings.TrimPrefix(source, "github:")
@@ -185,6 +188,9 @@ func githubRepository(source string) (string, bool) {
 }
 
 func gitlabRepository(source string) (string, bool) {
+	if hasUnsafeSourceRune(source) {
+		return "", false
+	}
 	var repository string
 	switch {
 	case strings.HasPrefix(source, "gitlab:"):
@@ -317,8 +323,8 @@ func validSCPGitSource(source string) bool {
 }
 
 func portableRemoteSource(source string) bool {
-	if source == "" || source != strings.TrimSpace(source) ||
-		strings.IndexFunc(source, unicode.IsSpace) >= 0 || strings.ContainsAny(source, `?#\`) ||
+	if source == "" || source != strings.TrimSpace(source) || hasUnsafeSourceRune(source) ||
+		strings.ContainsAny(source, `?#\`) ||
 		source == "." || source == ".." || filepath.IsAbs(source) ||
 		strings.HasPrefix(source, "./") || strings.HasPrefix(source, "../") ||
 		strings.HasPrefix(source, "~/") || strings.HasPrefix(strings.ToLower(source), "file:") ||
@@ -331,6 +337,12 @@ func portableRemoteSource(source string) bool {
 	}
 	_, hasPassword := parsed.User.Password()
 	return !hasPassword && parsed.Scheme != "http" && parsed.Scheme != "https"
+}
+
+func hasUnsafeSourceRune(source string) bool {
+	return strings.IndexFunc(source, func(character rune) bool {
+		return unicode.IsSpace(character) || unicode.IsControl(character)
+	}) >= 0
 }
 
 func windowsAbsoluteSource(source string) bool {
