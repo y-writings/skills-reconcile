@@ -53,7 +53,8 @@ Goの直接build、Nix package、開発コンテナを同じCLI契約に対し�
 
 J01 は UTF-8、単一の JSON 値、全階層の重複 member 拒否を共有する。C02 では既知 field の
 canonical spelling を型 decode 前に検査する共通 object decoder を追加する。field 集合、未知 field
-の扱い、型・null・domain 検証は各 reader package に残す。
+の扱い、型・null・domain 検証は各 reader package に残す。lock と workspace config は未知 field を
+将来拡張用として許容し、workspace config の非empty object は正確な `workspace` field を必須とする。
 
 C04 から C06 の間では、不完全な manifest を CLI の通常経路へ通さない。C07 で公開する時点で、
 remote entry に必要な検証がすべて有効になっていることを確認する。
@@ -143,7 +144,7 @@ F03 まで `.worktrees/skills` は変更・削除しない。旧実装の除去�
 
 - [ ] この PR が追加する利用者向けの振る舞いを一文で説明できる。
 - [ ] 移行元の基準コミットから参照した関数・テストを PR 本文へ記載した。
-- [ ] 未対応の入力を無視せず、明示的に拒否する。
+- [ ] 未対応の入力を明示的に拒否し、将来拡張用として許容する未知 field は契約に明記した。
 - [ ] 手書きによる非テスト実装の追加行＋削除行が 500 行以下である。
 - [ ] 実装と対応テストを同じ PR に含め、実装、テスト、fixture、生成物、文書を別集計した。
 - [ ] 手書き総差分が 1,000 行を超える場合、分割要否をレビューした。

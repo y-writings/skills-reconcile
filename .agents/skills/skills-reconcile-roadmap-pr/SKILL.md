@@ -116,7 +116,7 @@ stop before implementation. Do not create a branch or change files, commits, or 
 - Port behavior, not whole files. Preserve the destination CLI/module names and the dependency order
   in the plan.
 - Add synthetic fixtures and failure-path tests with the behavior. Keep unsupported inputs and flags
-  explicit rather than silently accepting them.
+  explicit, except unknown fields reserved by the reader's documented contract for forward compatibility.
 - Make the smallest reader-oriented change that satisfies the established contract. Do not add
   speculative abstractions or compatibility aliases.
 - Keep the migration source read-only and the destination buildable at every review boundary.

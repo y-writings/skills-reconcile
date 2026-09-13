@@ -18,7 +18,7 @@
   provide development or migration guidance for `skills-reconcile` and contain none of that
   prohibited source or user data.
 - Move one reviewable behavior and its tests at a time. Unsupported inputs and flags must fail
-  explicitly instead of being ignored.
+  explicitly, except unknown fields reserved by the reader's documented contract for forward compatibility.
 - Do not mix bug fixes, specification changes, general refactoring, or unrelated dependency updates
   into a migration change without explicit direction. When the source behavior is ambiguous or
   appears defective, report the evidence before implementing that behavior.

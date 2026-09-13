@@ -76,6 +76,11 @@ import path は移行先のモジュール名へ機械的に変更する。大�
 | adopt          | remote と workspace を暗黙に混同せず、上書き前に停止する                   | dry-run と失敗系テスト      |
 | v1 互換        | `migrate` と schema v1 の `capture` を schema v2 の通常経路から分離する    | 互換 fixture                |
 
+workspace config の version なし形式では、top-level の `workspace` だけを解釈し、その他の field は
+将来拡張用として許容する。空 object は設定なしとして扱う。非empty object は正確な `workspace` field を
+必須とし、その case alias、null、文字列以外の値、重複 member を拒否する。これは PR #11 で導入した
+未知の設定 field をすべて拒否する契約からの意図的な変更である。
+
 ## 意図的に変更する名前
 
 既存利用者との後方互換性は不要なため、移行先では製品名に連動する識別子を
