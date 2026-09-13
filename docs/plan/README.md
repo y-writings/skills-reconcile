@@ -95,7 +95,8 @@ inventory の参照revisionは自動では動かさない。参照revisionの変
 10. 外部 CLI の private lock を所有権の根拠にしない。書き込み前の intent と、成功後の公開CLI観測・
     installed tree fingerprintを結び付けたmachine-local receiptで所有権を記録する。
 11. 利用者向けcommandは、grammar、flag、終了status、stdout/stderr、machine-readable output、副作用を
-    [CLI契約](cli-contract.md)へ明記した文書PRを、対応する実装PRより先に承認する。
+    [CLI契約](cli-contract.md)へ明記した文書PRを、対応する実装PRより先に承認する。openなstack layerを
+    先行契約にする場合は、maintainerがその正確なhead commitを明示承認してから実装を開始する。
 
 ## 計画書の構成
 

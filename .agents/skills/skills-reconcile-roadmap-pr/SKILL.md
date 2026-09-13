@@ -63,7 +63,11 @@ machine state, credentials, or user-specific configuration into the destination.
    confirm the stack root has that base and the immediate base is the preceding item's branch.
 4. In a regular workflow, confirm the preceding roadmap item is merged and there is no open feature
    pull request on which this item would depend. In an explicitly requested stack, confirm each open
-   dependency is an earlier layer of that same stack and follows roadmap order.
+   dependency is an earlier layer of that same stack and follows roadmap order. Before implementing a
+   user-facing command against an open contract layer, also confirm a maintainer explicitly approved
+   that contract PR's exact current head and record the commit and approval evidence in the dependent
+   PR body. Review completion, resolved threads, and stack position are not approval; a new contract
+   commit requires approval again.
 5. When implementing or investigating an item, identify exactly one roadmap item. Stop if repository
    history and the roadmap do not identify one unambiguous next item.
 6. When implementing an item, create a new branch from that base. Use a stack only when the user has
@@ -88,7 +92,8 @@ working contract in a commentary update with:
 | Verification   | Targeted, full, Nix, container, policy, and manual checks that apply |
 
 Continue without waiting when the contract is supported consistently, fits the roadmap item, and
-meets all gates below. The commentary update is an audit trail, not a request for another approval.
+meets all gates below. For a user-facing command in an open stack, this includes exact-head contract
+approval from a maintainer. The commentary update is an audit trail, not approval evidence.
 
 ## Stop for a material decision
 
@@ -107,6 +112,8 @@ Stop before commit, push, or pull request creation when any of these conditions 
 - destructive ownership, deletion targets, or required test isolation cannot be proven;
 - in a regular workflow the previous feature pull request is unmerged, or in an explicitly requested
   stack the root or immediate-base relationship fails the preflight rules;
+- an open contract layer required by a user-facing command lacks explicit maintainer approval for its
+  current head, or the dependent PR body lacks the commit and approval evidence;
 - `main` is failing or a required verification path remains unavailable or unresolved;
 - the outgoing branch, commit, or pull request would expose private or machine-specific data; or
 - a choice would materially alter the approved scope or user-visible contract.

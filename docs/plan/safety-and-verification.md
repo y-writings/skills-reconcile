@@ -145,7 +145,8 @@ manifest 書き換えを行わない。配布が必要になる F03 は、テス
 1. ロードマップから次の一項目だけを選ぶ。
 2. 実装前に、入力、期待する出力、副作用、未対応範囲を短い作業メモとして整理する。
 3. 承認済みの製品契約と、利用する外部dependencyの公開境界を列挙する。利用者向けcommandでは、
-   対応する[CLI契約](cli-contract.md)のentryが先行PRで承認済みであることも確認する。
+   対応する[CLI契約](cli-contract.md)のentryが先行PRで承認済みであることも確認する。openなstack
+   layerの場合は、現在headへのmaintainer明示承認と、依存PR本文に記録する証跡を確認する。
 4. 合成 fixture と失敗系テストを先に用意し、コンテナで対象範囲だけを反復する。
 5. 対象の振る舞いを移し、全テストを実行して、差分内訳、500行制限、禁止対象を確認する。
 6. 必須のローカル検証がすべて成功し、未解決の仕様判断がない場合だけ承認されたregularまたは
@@ -174,7 +175,8 @@ manifest 書き換えを行わない。配布が必要になる F03 は、テス
 - regular PRで前のPRが未merge、またはexplicitなstackのrootが最新の成功した`main`に基づかない。
 - explicitなstackで、対象項目の直接のbaseが先行項目のbranchでない、または各layerを直接のbaseに
   対してbuild・testできない。
-- 利用者向けcommandの実装または変更に、先に承認された完全なCLI契約entryがない。
+- 利用者向けcommandの実装または変更に、先に承認された完全なCLI契約entryがない。openな契約PRでは、
+  maintainerが現在のhead commitを明示承認していない、または依存PR本文に承認証跡がない場合も含む。
 - コンテナと CI で結果が一致しない。
 
 ## 切り替え手順

@@ -23,7 +23,8 @@ workflow、shell script、mise など実行動作を変える設定は、この�
 `K`で始まる項目は文書だけのCLI契約PRとする。grammar、全flag、終了status、stdout/stderr、JSON
 schema、副作用、未対応入力を[CLI契約](cli-contract.md)へ確定し、対応する実装項目より先に承認する。
 explicitなstackで進める場合も、契約PRを対応する実装PRの直接のbaseにする。実装PRで未承認の
-interfaceを追加または変更しない。
+interfaceを追加または変更しない。openな契約PRに依存する実装は、maintainerが契約PRの正確なhead
+commitを明示承認した後にだけ開始し、依存PR本文へcommitと承認の所在を記録する。
 
 ## フェーズ 0: 計画
 

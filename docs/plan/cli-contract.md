@@ -8,8 +8,12 @@
 承認されたentryだけを実装できる。PRロードマップにあるcommand名は実装範囲を示すlabelであり、
 grammar、flag、終了status、出力または副作用を定義しない。
 
-CLI entryを追加または変更するPRは文書だけで作成し、対応する実装PRより先にmergeする。explicitな
-stackでは、契約PRを実装PRの直接のbaseにできる。契約と実装を同じPRで新規決定しない。
+CLI entryを追加または変更するPRは文書だけで作成し、対応する実装PRより先行させる。regular
+workflowでは実装着手前にmergeする。explicitなstackでは、契約PRを実装PRの直接のbaseにできる。
+この場合は、maintainerが契約PRの正確なhead
+commitを明示的に承認し、依存する実装PRの本文へcommitと承認の所在を記録してから実装を開始する。
+reviewの依頼・完了、thread解決、branchの位置だけを承認と扱わない。契約PRのheadが変わった時点で
+承認は失効し、更新後のheadを再承認するまで依存実装を進めない。契約と実装を同じPRで新規決定しない。
 
 各entryは、少なくとも次をすべて定義する。
 

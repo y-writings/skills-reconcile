@@ -9,8 +9,9 @@
 - Treat only behavior explicitly specified by the approved product contracts in `docs/plan/**`, plus
   the public CLI of the pinned `skills` package, as implementation authority. A roadmap item name is
   not a CLI grammar or output contract.
-- Do not implement a user-facing command until its complete entry in `docs/plan/cli-contract.md` has
-  been approved in an earlier documentation PR.
+- Do not implement a user-facing command until its complete entry in `docs/plan/cli-contract.md` is
+  either merged or explicitly approved by a maintainer at the exact head commit of an earlier
+  documentation PR. A later commit invalidates that approval.
 - Treat `.worktrees/skills` at commit `3c15f60` as a read-only inventory and rollback reference. Do
   not use its implementation, tests, or output to justify a contract, and do not modify or delete it.
 - Do not import private modules from `skills`, reproduce its private source parser, or read its private
