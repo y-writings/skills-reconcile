@@ -10,6 +10,7 @@ func TestDecodeWorkspaceConfig(t *testing.T) {
 		{"missing workspace", " \n{}\t", "", false},
 		{"empty workspace", `{"workspace":""}`, "", false},
 		{"configured workspace", `{"workspace":"/workspace"}`, "/workspace", true},
+		{"configured workspace with future field", `{"workspace":"/workspace","future":{"enabled":true}}`, "/workspace", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, found, err := decodeWorkspaceConfig([]byte(tc.data))
@@ -26,7 +27,7 @@ func TestDecodeWorkspaceConfigRejectsInvalidConfig(t *testing.T) {
 		{"null config", `null`},
 		{"null workspace", `{"workspace":null}`},
 		{"wrong workspace type", `{"workspace":42}`},
-		{"unknown field", `{"workpace":"/workspace"}`},
+		{"nonempty object without exact workspace", `{"workpace":"/workspace"}`},
 		{"case variant", `{"workspace":"/workspace","Workspace":"/other"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1,4 +1,4 @@
-// Package jsondoc validates properties shared by every JSON document reader.
+// Package jsondoc validates and decodes properties shared by JSON document readers.
 package jsondoc
 
 import (

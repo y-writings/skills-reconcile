@@ -88,7 +88,7 @@ func TestReadObservedDistinguishesMissingFromInvalid(t *testing.T) {
 
 func TestReadObservedReadsValidLockAndFutureFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lock.json")
-	content := `{"version":3,"skills":{"x":{"source":"example.com","sourceType":"well-known","sourceUrl":"https://cdn.example.com/x.tgz","sourceBaseUrl":"https://example.com/skills","ref":"v1","skillPath":"skills/x/SKILL.md","agents":["codex"]},"y":{"source":"org/repo","sourceType":"github"}},"futureField":{"number":1e1000}}`
+	content := `{"version":3,"skills":{"x":{"source":"example.com","sourceType":"well-known","sourceUrl":"https://cdn.example.com/x.tgz","sourceBaseUrl":"https://example.com/skills","ref":"v1","skillPath":"skills/x/SKILL.md","agents":["codex"],"futureEntryField":true},"y":{"source":"org/repo","sourceType":"github"}},"futureField":{"number":1e1000}}`
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}

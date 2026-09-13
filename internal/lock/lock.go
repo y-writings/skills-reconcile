@@ -2,7 +2,6 @@
 package lock
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -43,25 +42,11 @@ var lockJSONFields, entryJSONFields = []string{"version", "skills", "dismissed",
 
 func (lock *Lock) UnmarshalJSON(data []byte) error {
 	type plainLock Lock
-	return decodeCanonicalJSON(data, lockJSONFields, (*plainLock)(lock))
+	return jsondoc.UnmarshalCanonicalObject(data, lockJSONFields, (*plainLock)(lock))
 }
 func (entry *Entry) UnmarshalJSON(data []byte) error {
 	type plainEntry Entry
-	return decodeCanonicalJSON(data, entryJSONFields, (*plainEntry)(entry))
-}
-func decodeCanonicalJSON(data []byte, canonicalFields []string, destination any) error {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
-	for field := range fields {
-		for _, canonical := range canonicalFields {
-			if field != canonical && strings.EqualFold(field, canonical) {
-				return fmt.Errorf("non-canonical JSON field %q", field)
-			}
-		}
-	}
-	return json.Unmarshal(data, destination)
+	return jsondoc.UnmarshalCanonicalObject(data, entryJSONFields, (*plainEntry)(entry))
 }
 
 // Path returns the global lock path for the current environment.
@@ -99,12 +84,9 @@ func Read(path string) (*Lock, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := jsondoc.Validate(data); err != nil {
-		return nil, fmt.Errorf("decode global lock: %w", err)
-	}
-
 	var observed Lock
-	if err := json.Unmarshal(data, &observed); err != nil {
+	type plainLock Lock
+	if err := jsondoc.UnmarshalCanonicalObject(data, lockJSONFields, (*plainLock)(&observed)); err != nil {
 		return nil, fmt.Errorf("decode global lock: %w", err)
 	}
 	if observed.Version != 3 {

@@ -11,6 +11,7 @@ import (
 )
 
 var errInvalidConfig = errors.New("invalid skills-reconcile config")
+var workspaceConfigJSONFields = []string{"workspace"}
 
 func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error) {
 	configHome := os.Getenv(envvars.XDGConfigHome)
@@ -35,19 +36,15 @@ func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error)
 }
 
 func decodeWorkspaceConfig(data []byte) (workspaceDir string, found bool, err error) {
-	if jsondoc.Validate(data) != nil {
-		return "", false, errInvalidConfig
-	}
-
 	var config map[string]json.RawMessage
-	if json.Unmarshal(data, &config) != nil || config == nil {
+	if jsondoc.UnmarshalCanonicalObject(data, workspaceConfigJSONFields, &config) != nil {
 		return "", false, errInvalidConfig
 	}
 	if len(config) == 0 {
 		return "", false, nil
 	}
 	workspaceValue, found := config["workspace"]
-	if len(config) != 1 || !found {
+	if !found {
 		return "", false, errInvalidConfig
 	}
 	var workspace *string
