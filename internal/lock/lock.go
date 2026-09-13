@@ -4,6 +4,7 @@ package lock
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -266,9 +267,9 @@ func validHostedRepositoryPart(part string) bool {
 func supportedRepositoryURLScheme(scheme string) bool {
 	return scheme == "http" || scheme == "https" || scheme == "ssh"
 }
-func validRemotePort(parsed *url.URL) bool {
-	port, err := strconv.ParseUint(parsed.Port(), 10, 16)
-	return parsed.Port() == "" || (err == nil && port != 0)
+func validRemotePort(port string) bool {
+	portNumber, err := strconv.ParseUint(port, 10, 16)
+	return port == "" || (err == nil && portNumber != 0)
 }
 func plainRepositoryURL(source string, parsed *url.URL, hostname string) bool {
 	return !strings.ContainsAny(source, "?#") &&
@@ -295,7 +296,7 @@ func parseWellKnownURL(source string) (*url.URL, bool) {
 		return nil, false
 	}
 	parsed, err := url.Parse(source)
-	if err != nil || parsed.Hostname() == "" || !validRemotePort(parsed) || parsed.User != nil || strings.HasSuffix(source, ".git") ||
+	if err != nil || parsed.Hostname() == "" || !validRemotePort(parsed.Port()) || parsed.User != nil || strings.HasSuffix(source, ".git") ||
 		reservedWellKnownHost(parsed.Hostname()) || sourceSelectsDifferentProvider(source, parsed) {
 		return nil, false
 	}
@@ -318,7 +319,7 @@ func validGenericGitSource(source string) bool {
 		return false
 	}
 	parsed, err := url.Parse(source)
-	if err == nil && parsed.Hostname() != "" && validRemotePort(parsed) {
+	if err == nil && parsed.Hostname() != "" && validRemotePort(parsed.Port()) {
 		if sourceSelectsDifferentProvider(source, parsed) {
 			return false
 		}
@@ -341,22 +342,17 @@ func validGenericGitSource(source string) bool {
 	return validSCPGitSource(source)
 }
 
-func nonEmptyRepositoryPath(parsed *url.URL) bool {
-	return strings.Trim(parsed.Path, "/") != ""
-}
+func nonEmptyRepositoryPath(parsed *url.URL) bool { return strings.Trim(parsed.Path, "/") != "" }
 func validSCPGitSource(source string) bool {
 	if strings.Contains(source, "://") {
 		return false
 	}
 	separator := strings.IndexByte(source, ':')
-	bracketStart := strings.Index(source, "@[") + 1
-	if bracketStart <= separator && source[bracketStart] == '[' {
+	if bracketStart := strings.Index(source, "@[") + 1; bracketStart <= separator && source[bracketStart] == '[' {
 		close := bracketStart + strings.IndexByte(source[bracketStart:], ']')
-		if close >= bracketStart {
-			separator = strings.IndexByte(source[close+1:], ':')
-			if separator >= 0 {
-				separator += close + 1
-			}
+		separator = close + 1
+		if close < bracketStart || separator >= len(source) || source[separator] != ':' {
+			separator = -1
 		}
 	}
 	if separator <= 0 || strings.Trim(source[separator+1:], "/") == "" || strings.HasPrefix(source[separator+1:], "-") || strings.HasPrefix(source[separator+1:], ":") {
@@ -370,6 +366,14 @@ func validSCPGitSource(source string) bool {
 	effectiveHostname := hostname
 	if unwrapped, _, bracketed := strings.Cut(strings.TrimPrefix(hostname, "["), "]"); bracketed && strings.HasPrefix(hostname, "[") {
 		effectiveHostname = unwrapped
+		if host, port, hasPort := strings.Cut(unwrapped, ":"); hasPort && !strings.Contains(port, ":") {
+			if host == "" || port == "" || !validRemotePort(port) {
+				return false
+			}
+			effectiveHostname = host
+		} else if _, err := netip.ParseAddr(unwrapped); hasPort && err != nil {
+			return false
+		}
 	}
 	optionLikeHostname := strings.HasPrefix(authority, "-") || strings.HasPrefix(effectiveHostname, "-")
 	return effectiveHostname != "" && !strings.HasPrefix(authority, "@") && !optionLikeHostname && !reservedWellKnownHost(effectiveHostname)
