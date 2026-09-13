@@ -5,7 +5,12 @@
 ## Source of truth
 
 - Before migration work, read `docs/plan/README.md` and the plan document relevant to the task.
-- Treat `.worktrees/skills` at commit `3c15f60` as a read-only reference. Do not modify or delete it.
+- Treat the approved product contracts in `docs/plan/**` and the public CLI of the pinned `skills`
+  package as the implementation authority.
+- Treat `.worktrees/skills` at commit `3c15f60` as a read-only inventory and rollback reference. Do
+  not use its implementation, tests, or output to justify a contract, and do not modify or delete it.
+- Do not import private modules from `skills`, reproduce its private source parser, or read its private
+  global lock as a `skills-reconcile` input contract.
 - The destination CLI and Go module are `skills-reconcile` and
   `github.com/y-writings/skills-reconcile`. Do not add a `skills-sync` compatibility alias.
 
@@ -17,11 +22,11 @@
   managed Skills. Repository-local Skills under `.agents/skills/**` may be committed when they only
   provide development or migration guidance for `skills-reconcile` and contain none of that
   prohibited source or user data.
-- Move one reviewable behavior and its tests at a time. Unsupported inputs and flags must fail
+- Implement one approved, reviewable behavior and its tests at a time. Unsupported inputs and flags must fail
   explicitly instead of being ignored.
 - Do not mix bug fixes, specification changes, general refactoring, or unrelated dependency updates
-  into a migration change without explicit direction. When the source behavior is ambiguous or
-  appears defective, report the evidence before implementing that behavior.
+  into a migration change without explicit direction. When an approved contract and the public
+  dependency boundary disagree, report the evidence before implementing that behavior.
 
 ## Safety boundaries
 

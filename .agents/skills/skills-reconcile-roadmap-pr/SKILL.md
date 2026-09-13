@@ -1,6 +1,6 @@
 ---
 name: skills-reconcile-roadmap-pr
-description: Advance exactly one skills-reconcile migration roadmap item from preflight through a verified regular pull request. Use only when explicitly invoked in this repository; stop for unresolved scope, specification, safety, or verification decisions.
+description: Advance exactly one skills-reconcile roadmap item from preflight through a verified pull request. Use only when explicitly invoked in this repository; stop for unresolved scope, specification, safety, or verification decisions.
 ---
 
 <!-- markdownlint-disable MD013 -->
@@ -10,8 +10,8 @@ description: Advance exactly one skills-reconcile migration roadmap item from pr
 ## Outcome
 
 Start work on exactly one item in `docs/plan/pr-roadmap.md` from the latest successful `main`.
-On the green path, investigate the source and destination, implement and verify the item, commit and
-push the branch, and create a regular pull request. Never merge the pull request.
+On the green path, establish the destination contract, implement and verify the item, commit and
+push the branch, and create a pull request with the approved branch workflow. Never merge the pull request.
 
 ## Interpret the invocation
 
@@ -22,7 +22,7 @@ push the branch, and create a regular pull request. Never merge the pull request
   - a named verification runs only that check on the current checkout;
   - investigation stops after establishing and reporting the working contract;
   - a verified local change stops after implementation and verification; and
-  - a regular pull request is the default when the user does not set an earlier endpoint.
+  - a pull request is the default when the user does not set an earlier endpoint.
 - Do not proceed beyond the chosen endpoint. Explicit invocation authorizes the complete green path
   only when the user has not limited it, and routine implementation choices already follow from the
   established contract.
@@ -43,9 +43,10 @@ Before continuing with the roadmap workflow, read:
 6. the repository pull request template; and
 7. any item-specific documentation or instructions discovered from those files.
 
-Treat the migration source and its pinned revision exactly as `AGENTS.md` defines them. Inspect that
-source read-only. Never copy Skill bodies, real manifests, machine state, credentials, or
-user-specific configuration into the destination.
+Treat the approved plan and the pinned dependency's public boundary as `AGENTS.md` defines them.
+Inspect the migration inventory read-only to locate candidate capabilities and dependencies. Never use
+its implementation, tests, or output to justify a contract, and never copy Skill bodies, real manifests,
+machine state, credentials, or user-specific configuration into the destination.
 
 ## Run preflight
 
@@ -59,15 +60,17 @@ user-specific configuration into the destination.
    there is no open feature pull request on which this item would depend.
 5. When implementing or investigating an item, identify exactly one roadmap item. Stop if repository
    history and the roadmap do not identify one unambiguous next item.
-6. When implementing an item, create a new, non-stacked branch from that base.
+6. When implementing an item, create a new branch from that base. Use a stack only when the user has
+   explicitly requested one, and keep every layer buildable and reviewable on its immediate base.
 
 For an investigation endpoint, do not fetch or update Git refs; use read-only remote or GitHub
 API queries when freshness is needed, and report that the local base was not refreshed.
 
 ## Establish the contract before implementation
 
-Inspect the relevant source implementation, source tests, source documentation, and current
-destination code. Then state a compact working contract in a commentary update with:
+Inspect the approved product contract, the current destination code, and the public boundary of any
+dependency involved. Use the migration inventory only to locate candidate scope. Then state a compact
+working contract in a commentary update with:
 
 | Field          | Required content                                                     |
 | -------------- | -------------------------------------------------------------------- |
@@ -113,13 +116,13 @@ stop before implementation. Do not create a branch or change files, commits, or 
 
 ## Implement one item
 
-- Port behavior, not whole files. Preserve the destination CLI/module names and the dependency order
-  in the plan.
+- Implement the approved behavior in the destination's responsibility boundary. Preserve the
+  destination CLI/module names and the dependency order in the plan.
 - Add synthetic fixtures and failure-path tests with the behavior. Keep unsupported inputs and flags
   explicit rather than silently accepting them.
 - Make the smallest reader-oriented change that satisfies the established contract. Do not add
   speculative abstractions or compatibility aliases.
-- Keep the migration source read-only and the destination buildable at every review boundary.
+- Keep the migration inventory read-only and the destination buildable at every review boundary.
 - Do not update roadmap completion records before the feature pull request is merged unless the plan
   explicitly assigns that documentation to the selected item.
 
@@ -147,19 +150,19 @@ stop before publication.
 
 ## Publish the green path
 
-Only the regular pull request endpoint enters this sequence. Proceed when every applicable local
+Only the pull request endpoint enters this sequence. Proceed when every applicable local
 check passes and no material decision remains:
 
 1. create a focused semantic commit;
-2. push the non-stacked branch;
+2. push the branch with the approved regular or stacked workflow;
 3. fill the repository pull request template, including the contract, deliberate exclusions,
    verification results, actual line-count categories, and any carry-over;
 4. remove placeholders and private or machine-specific details from all public text;
-5. create a regular pull request without a draft flag; and
+5. create a pull request without a draft flag; and
 6. query the created pull request and confirm its base, head, URL, body, and `isDraft: false`.
 
 If CI or review later exposes a routine in-scope defect, fix it on the same branch and reverify. If it
-exposes a material decision, leave the regular pull request open, do not merge it, and present the
+exposes a material decision, leave the pull request open, do not merge it, and present the
 same evidence and options required by the stop gate.
 
 ## Report the result

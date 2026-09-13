@@ -2,43 +2,42 @@
 
 # 対象範囲と互換性
 
-## 移行単位
+## 実装単位
 
-移行元は Go の CLI と、固定された npm パッケージとしての `skills` CLI から構成されている。
-現状は実装が約 4,300 行、テストが約 4,590 行ある。特に `cmd/skills-sync/main.go`、
-`internal/workspace`、`internal/planner` は大きいため、移行単位はファイルではなく責務と振る舞いに
-する。テスト量だけを理由に一つの振る舞いを複数 PR へ分けない。
+移行単位はinventoryのファイルやpackageではなく、合意した製品責務と利用者から見える振る舞いにする。
+inventoryにある約4,300行の実装と約4,590行のテストは、対象機能や依存関係の所在を調べる用途に限る。
+テスト量だけを理由に一つの振る舞いを複数PRへ分けない。
 
-| 責務                             | 移行元                | 主な依存先                                     |
-| -------------------------------- | --------------------- | ---------------------------------------------- |
-| CLI の組み立て                   | `cmd/skills-sync`     | すべての内部パッケージ                         |
-| manifest のモデル・検証・保存    | `internal/manifest`   | agent 検証、ファイルロック                     |
-| workspace 解決・Skill ツリー検証 | `internal/workspace`  | ファイルシステム                               |
-| グローバル lock の観測           | `internal/lock`       | ファイルシステム                               |
-| インストール状態の観測           | `internal/inspect`    | workspace、外部 `skills` CLI                   |
-| workspace projection             | `internal/projection` | ファイルロック                                 |
-| desired と observed の比較       | `internal/planner`    | manifest、lock、inspect、workspace、projection |
-| 外部 CLI の実行                  | `internal/executor`   | planner、manifest、inspect、workspace          |
-| install・再観測・prune の制御    | `internal/reconcile`  | planner、executor                              |
-| 既存 Skill の採用                | `internal/adopt`      | manifest、lock、inspect、workspace             |
-| v1 状態の取り込み                | `internal/capture`    | manifest、lock、inspect                        |
-| 排他制御                         | `internal/filelock`   | ファイルシステム                               |
+| 責務                             | 移行先のowner候補      | 主な依存先                                  |
+| -------------------------------- | ---------------------- | ------------------------------------------- |
+| CLI の組み立て                   | `cmd/skills-reconcile` | すべての内部package                         |
+| manifest のモデル・検証・保存    | `internal/manifest`    | agent検証、ファイルロック                   |
+| workspace 解決・Skill ツリー検証 | `internal/workspace`   | ファイルシステム                            |
+| 外部CLIとinstall状態の観測       | `internal/skillscli`   | 公開された `skills` CLI                     |
+| 所有権のintentとreceipt          | `internal/receipt`     | manifest宣言、公開CLI観測、tree fingerprint |
+| workspace projection             | `internal/projection`  | receipt、ファイルロック                     |
+| desired と observed の比較       | `internal/planner`     | manifest、公開CLI観測、receipt、workspace   |
+| 外部 CLI の実行                  | `internal/executor`    | planner、manifest、workspace                |
+| install・再観測・prune の制御    | `internal/reconcile`   | planner、executor、receipt                  |
+| 既存 Skill の明示的な採用        | `internal/adopt`       | manifest、公開CLI観測、receipt、workspace   |
+| 明示されたv1入力の取り込み       | `internal/capture`     | manifest、公開CLI観測、receipt              |
+| 排他制御                         | `internal/filelock`    | ファイルシステム                            |
 
 この依存方向に従い、下位の読み取り責務から移す。CLI へ公開するのは、対象機能の失敗条件まで
 テストできた後とする。
 
-## コピーするもの
+## 実装するもの
 
-- `cmd/skills-sync` のサブコマンドを、移行先の `cmd/skills-reconcile` へ移した CLI 契約
-- `internal/**` の管理ロジックと対応するテストのうち、合意済みの振る舞い
+- 合意済みの `skills-reconcile` CLI 契約
+- 合意済みの管理ロジックと、その振る舞いを証明する移行先固有のテスト
 - `go.mod`
 - `tools/skills/package.json` と `package-lock.json`
 - `flake.nix` と `flake.lock`。移行元からのコピーではなく、移行先の package 定義として作成する
 - 開発・テストに必要な `Dockerfile`、`.dockerignore`、関連する ignore 設定
 - ツールの利用方法と安全上の注意を説明するドキュメント
 
-import path は移行先のモジュール名へ機械的に変更する。大きなファイルは必要に応じて責務別に
-分割できるが、その PR では外部仕様を変えない。
+移行先は `github.com/y-writings/skills-reconcile` のpackageとして実装する。inventoryのpackage境界や
+関数を互換対象にせず、上表の責務に沿って必要最小限のAPIを定義する。
 
 ## コピーしないもの
 
@@ -58,23 +57,34 @@ import path は移行先のモジュール名へ機械的に変更する。大�
 確認する。機密情報の機械的な検出は既存security scanに委ねる。テスト fixture は
 `internal/**/testdata` または一時ディレクトリだけに置く。
 
-## 維持する契約
+## 製品契約
 
-最終的な互換性の基準は、移行元のファイル構造ではなく次の利用者向け契約とする。
+実装の基準は、次の利用者向け契約と、固定した `skills` が公開するCLI境界とする。
 
-| 領域           | 維持する契約                                                               | 移行時の確認                |
-| -------------- | -------------------------------------------------------------------------- | --------------------------- |
-| CLI            | `skills-reconcile` のサブコマンド、主要フラグ、終了コード、出力の役割      | black-box テスト            |
-| workspace 選択 | `--workspace`、環境変数、設定、カレントディレクトリの優先順                | table-driven test           |
-| manifest       | strict decode、schema、名前、source、ref、agent、決定的な出力              | fixture と unit test        |
-| 観測           | lock がない場合と壊れている場合を区別し、`skills ls` を安全に解釈する      | fake CLI と fixture         |
-| plan           | install、reconfigure、unchanged、conflict、stale、untracked などを区別する | 状態表テスト                |
-| apply          | 全体を事前検証し、install 後に再観測してから成功とする                     | コンテナ統合テスト          |
-| prune          | 明示指定時だけ実行し、所有権と再観測で削除対象を確認する                   | 負のテストを含む統合テスト  |
-| workspace      | Skill ツリーの内容、実行 bit、symlink、パス、digest を検証する             | 一時ツリーのテスト          |
-| projection     | 端末固有状態を Git 管理せず、競合しない原子的更新を行う                    | 分離した XDG state のテスト |
-| adopt          | remote と workspace を暗黙に混同せず、上書き前に停止する                   | dry-run と失敗系テスト      |
-| v1 互換        | `migrate` と schema v1 の `capture` を schema v2 の通常経路から分離する    | 互換 fixture                |
+| 領域           | 契約                                                                      | 検証                        |
+| -------------- | ------------------------------------------------------------------------- | --------------------------- |
+| CLI            | 合意したサブコマンド、主要フラグ、終了コード、出力の役割                  | black-box テスト            |
+| workspace 選択 | `--workspace`、環境変数、設定、カレントディレクトリの優先順               | table-driven test           |
+| manifest       | strict decode、schema、名前、opaqueなsource宣言、agent、決定的な出力      | fixture と unit test        |
+| 観測           | `skills --version` と `skills list -g --json`、installed treeを安全に読む | fake CLI と fixture         |
+| ownership      | intent、宣言digest、公開CLI観測、tree fingerprintをreceiptへ結び付ける    | 状態表と失敗注入            |
+| plan           | install、reconfigure、unchanged、conflict、untrackedなどを区別する        | 状態表テスト                |
+| apply          | intent記録後に実行し、再観測とreceipt確定後だけ成功とする                 | コンテナ統合テスト          |
+| prune          | 明示指定時だけ、receiptと現在のfingerprintが一致する対象を削除する        | 負のテストを含む統合テスト  |
+| workspace      | Skill ツリーの内容、実行 bit、symlink、パス、digest を検証する            | 一時ツリーのテスト          |
+| machine state  | receiptとprojectionをGit管理せず、競合しない原子的更新を行う              | 分離した XDG state のテスト |
+| adopt          | remoteのsource宣言とkindを明示させ、上書き前に停止する                    | dry-run と失敗系テスト      |
+| v1 互換        | 明示されたv1入力だけをschema v2の通常経路から分離して扱う                 | 互換 fixture                |
+
+remote source は外部CLIへ渡す宣言全体をそのまま保持し、完全一致と宣言digestだけを比較する。
+`skills-reconcile` は空値、制御文字、credential、remote kindでのlocal pathなど、自身のmanifestと
+実行安全性に属する規則だけを検証する。provider、alias、SCP、port、well-known URLの構文、または異なる
+表記の意味的同一性は判定しない。固定CLIがsourceを受理できるかどうかはapply時の実行結果で確定する。
+
+`skills-reconcile` は外部CLIのprivate global lockを直接読まない。公開一覧でsource情報が欠ける場合は
+原因を推測せずprovenance不明として扱い、receiptで所有権を証明できないinstallを変更または削除しない。
+receiptは外部CLI実行前のintentと事前観測を持ち、実行後の公開CLI観測とtree fingerprintが一意に
+確認できた場合だけ確定する。
 
 ## 意図的に変更する名前
 
@@ -121,14 +131,14 @@ Nix package の更新と無関係なGo、Node.js、`skills` の更新を同じPR
 
 ### 読み取り専用
 
-最初に workspace の場所、manifest、グローバル lock、インストール済み一覧を読み取る。次に
-`doctor` と remote Skill の `plan` を公開する。この間は外部 CLI のバージョン確認と一覧取得以外の
-サブコマンドを呼ばない。
+最初に workspace の場所、manifest、machine-local receipt、公開CLIによるインストール済み一覧を
+読み取る。次に `doctor` と remote Skill の `plan` を公開する。この間は外部CLIのバージョン確認と
+一覧取得以外のサブコマンドを呼ばない。
 
 ### 追加・更新
 
-原子的な manifest 更新と排他制御を先に移し、`add` を公開する。その後、外部 CLI の引数生成、
-install、再観測、収束判定を順番に移し、最後に prune なしの `apply` を公開する。
+原子的な manifest 更新と排他制御を先に実装し、`add` を公開する。その後、外部CLIの引数生成、
+intent記録、install、再観測、receipt確定を順番に実装し、最後にpruneなしの `apply` を公開する。
 
 ### 削除
 
@@ -137,37 +147,38 @@ manifest から desired entry を外す `remove` と、実インストールを�
 
 ### workspace と adopt
 
-workspace Skill の読み取り、内容検証、projection、plan、install を順番に移す。workspace の
-通常経路が収束してから `adopt PATH`、`adopt --installed` を追加する。
+workspace Skill の読み取り、内容検証、projection、plan、install を順番に実装する。remoteとworkspace
+という二つ目のinstall kindがそろった時点で、共通実行pipelineからkind固有処理を分離する。
+workspaceの通常経路が収束してから `adopt PATH`、明示sourceを要求する `adopt --installed` を追加する。
 
 ### v1 互換
 
-schema v2 の主要経路が完成した後で `migrate` と `capture` を移す。互換コマンドは通常の
-schema v2 経路へ機能を混ぜず、対象 schema を明示して検証する。
+schema v2 の主要経路が完成した後で、独立して承認された `migrate` と `capture` を実装する。
+互換コマンドは対象schemaとsource宣言を明示して検証し、private lockから値を推測しない。
 
 ## バグまたは仕様差を見つけた場合
 
-具体的な修正内容はこの計画では決めない。機能スライスの実装中に、移行元のコード、テスト、README
-の間で矛盾が見つかった場合は、PR 作成前なら commit、push、PR 作成を行わずに止める。PR 作成後の
-CI またはレビューで見つかった場合は、通常の PR を open のまま残して merge せず、次の情報だけを
+具体的な修正内容はこの計画では決めない。機能スライスの実装中に、承認済みの製品契約と固定した
+外部CLIの公開動作が両立しない場合は、PR作成前ならcommit、push、PR作成を行わずに止める。
+PR作成後のCIまたはレビューで見つかった場合は、PRをopenのまま残してmergeせず、次の情報だけを
 提示して判断を依頼する。
 
 1. 再現に必要な最小入力
-2. 移行元で実際に起きること
-3. テストまたは文書から読み取れる期待値
-4. そのまま互換にする場合と、先に直す場合の影響範囲
+2. 承認済みの製品契約
+3. 固定した外部CLIの公開境界で実際に起きること
+4. 契約または依存境界を変更する場合の影響範囲
 5. 手書きによる非テスト実装の 500 行制限内で分離可能かどうか
 
-判断後は、互換移行、修正を含む移行、独立した先行修正のいずれかを明示する。合意されていない
-挙動変更や一般的なリファクタリングを、行数調整のために混ぜない。
+判断後は、製品契約の変更、dependency adapterの変更、実装修正のいずれかを明示する。合意されて
+いない挙動変更や一般的なリファクタリングを、行数調整のために混ぜない。
 
-## 最終 parity の定義
+## 完了条件
 
 完了時には次を満たす。
 
-- `skills-reconcile` のサブコマンドと主要フラグの一覧が、合意した移行元機能と一致する。
-- 合意して移した契約テストが、移行先のコンテナで成功する。
+- `skills-reconcile` のサブコマンドと主要フラグが、承認済みの製品契約と一致する。
+- 合意した契約テストが、移行先のコンテナで成功する。
 - remote、workspace、adopt、prune、v1 互換の代表シナリオが合成環境で収束する。
 - 禁止対象の Skill 本体、実 manifest、端末固有状態を Git が追跡していない。
-- 意図的な差異はすべて文書化され、未判断の差異が残っていない。
-- 実環境へ切り替える前に、読み取り専用の `doctor` と `plan` の結果を人が比較している。
+- 固定した外部CLIの公開境界に対するcontract testが成功する。
+- 実環境へ切り替える前に、読み取り専用の `doctor` と `plan` の結果を人が承認している。

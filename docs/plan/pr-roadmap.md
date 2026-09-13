@@ -16,7 +16,7 @@ workflow、shell script、mise など実行動作を変える設定は、この�
 なった時点で分割を検討し、500 行を超えた PR はレビューへ回さない。分割時にも、各 PR はビルド可能で、
 公開済み機能を壊してはならない。
 
-以下の 50 項目は順序と責務を示す初期候補であり、50 個の PR を必須とするものではない。同じ一つの
+以下の項目は順序と責務を示す初期候補であり、同数のPRを必須とするものではない。同じ一つの
 利用者向け機能を完成させる隣接項目は、実装差分が 500 行以下なら着手前の合意で統合できる。別の
 利用者向け機能や仕様判断は、行数に余裕があっても同居させない。
 
@@ -40,52 +40,62 @@ Goの直接build、Nix package、開発コンテナを同じCLI契約に対し�
 
 ## フェーズ 2: 読み取りコア
 
-| ID  | PR の責務                                | 主な成果物                                              |    目安 | 完了条件                                                     |
-| --- | ---------------------------------------- | ------------------------------------------------------- | ------: | ------------------------------------------------------------ |
-| C01 | workspace と manifest の場所を解決する   | 優先順位、絶対パス検証、設定 fixture                    | 250–450 | flag、環境変数、設定、cwd の各経路を副作用なしで検証できる   |
-| J01 | JSON 文書の完全性を共通化する            | UTF-8、単一値、全階層の重複 member 拒否                 |  50–100 | workspace と後続 reader が同じ事前検証を利用できる           |
-| C02 | グローバル lock を読み取る               | lock decode、missing と invalid の区別、source identity | 300–450 | source provenance と復元可否を fixture で判定できる          |
-| C03 | agent 名と `skills ls` JSON を読む       | agent 正規化、一覧 decode、fake process                 | 300–450 | 不明 agent、壊れた JSON、外部コマンド失敗を区別できる        |
-| C04 | manifest のモデルと strict decode を移す | schema 型、未知 field・trailing JSON の拒否             | 250–400 | 合成 manifest を読み取れ、ファイル更新はまだ行わない         |
-| C05 | schema、default、名前を検証する          | version、agent、install name の規則                     | 250–430 | schema と名前衝突を実行前に拒否できる                        |
-| C06 | remote source を検証する                 | source、ref、skillPath、credential の規則               | 280–450 | portable でない remote entry を実行前に拒否できる            |
-| C07 | remote 範囲の `doctor` を公開する        | version 確認、入力・観測診断、CLI テスト                | 250–450 | container fixture に対して読み取り専用で成功・失敗を説明する |
+| ID  | PR の責務                                    | 主な成果物                                                 |    目安 | 完了条件                                                     |
+| --- | -------------------------------------------- | ---------------------------------------------------------- | ------: | ------------------------------------------------------------ |
+| C01 | workspace と manifest の場所を解決する       | 優先順位、絶対パス検証、設定 fixture                       | 250–450 | flag、環境変数、設定、cwd の各経路を副作用なしで検証できる   |
+| J01 | JSON 文書の完全性を共通化する                | UTF-8、単一値、全階層の重複 member 拒否                    |  50–100 | workspace と後続 reader が同じ事前検証を利用できる           |
+| J02 | canonical object decodeを共通化する          | object必須、known fieldのcase alias拒否                    |   50–90 | unknown field policyをcallerに残して型decodeできる           |
+| C02 | workspace設定をforward compatibleにする      | canonicalな`workspace`、unknown field許容                  |   20–50 | 将来fieldと既存workspace設定を同時に読み取れる               |
+| C03 | 公開された `skills` CLI を観測する           | version確認、global list decode、agent正規化、fake process | 300–450 | private lockを読まず、CLI失敗と曖昧な一覧を区別できる        |
+| C04 | manifest のモデルと strict decode を実装する | schema 型、未知 field・trailing JSON の拒否                | 250–400 | 合成 manifest を読み取れ、ファイル更新はまだ行わない         |
+| C05 | schema、default、名前を検証する              | version、agent、install name の規則                        | 250–430 | schema と名前衝突を実行前に拒否できる                        |
+| C06 | remote宣言の自前policyを検証する             | 空値、制御文字、credential、local path拒否                 | 180–300 | provider構文を解釈せず、manifest固有の危険だけ拒否できる     |
+| C07 | remote 範囲の `doctor` を公開する            | 入力・公開CLI観測の診断、CLI テスト                        | 250–450 | container fixture に対して読み取り専用で成功・失敗を説明する |
 
-J01 が共有するのは、UTF-8、単一の JSON 値、全階層の重複 member 拒否だけとする。workspace の
-設定 key・型・null の扱いと、C02 以降の各 reader の schema・domain 検証は、それぞれの package に残す。
-C02 以降は、各 reader を移す PR で J01 の事前検証を decode 入口へ接続する。
+J01はUTF-8、単一のJSON値、全階層の重複member拒否だけを共有する。J02はobject必須とknown fieldの
+canonical spellingを共有し、unknown field、型、null、domainのpolicyは各readerに残す。C03が依存するのは
+固定した `skills` の公開commandとmachine-readable outputだけとし、private module、private source parser、
+global lockのpathまたはschemaを実装しない。C06はsourceをopaqueな実行宣言として保持し、外部CLIが
+受理するprovider構文や異なる表記の意味的同一性を判定しない。
 
-C04 から C06 の間では、不完全な manifest を CLI の通常経路へ通さない。C07 で公開する時点で、
-remote entry に必要な検証がすべて有効になっていることを確認する。
+C04からC06の間では、不完全なmanifestをCLIの通常経路へ通さない。C07で公開する時点では、remote entryに
+必要な自前policyと公開CLI観測の不足を説明する。ownershipの判定と変更可否はR01以降で追加する。
 
-## フェーズ 3: remote の計画
+## フェーズ 3: remote のownershipと計画
 
-| ID  | PR の責務                   | 主な成果物                             |    目安 | 完了条件                                                      |
-| --- | --------------------------- | -------------------------------------- | ------: | ------------------------------------------------------------- |
-| R01 | remote の基本状態を分類する | install、unchanged、reconfigure        | 300–450 | desired、lock、installed の状態表テストが通る                 |
-| R02 | 異常・所有権状態を分類する  | conflict、stale、untracked、名前正規化 | 300–450 | 曖昧な状態を変更対象にせず、明示的な status にする            |
-| R03 | `plan` を公開する           | text/JSON 出力、終了条件、CLI テスト   | 250–450 | remote fixture に対して決定的な plan を読み取り専用で出力する |
+| ID  | PR の責務                       | 主な成果物                                    |    目安 | 完了条件                                                    |
+| --- | ------------------------------- | --------------------------------------------- | ------: | ----------------------------------------------------------- |
+| R01 | ownership receiptを読み取る     | schema、XDG path、missing/invalid、宣言digest | 250–400 | private lockなしで合成receiptを読み取れる                   |
+| R02 | installed treeをfingerprintする | path、file type、symlink、content digest      | 300–450 | receiptと現在のinstallを副作用なしで比較できる              |
+| R03 | remote の基本状態を分類する     | install、unchanged、reconfigure               | 300–450 | desired、公開CLI観測、receipt、fingerprintの状態表が通る    |
+| R04 | 異常・所有権状態を分類する      | conflict、untracked、曖昧な観測、名前正規化   | 300–450 | 証明できない対象を変更せず、明示的なstatusにする            |
+| R05 | `plan` を公開する               | text/JSON 出力、終了条件、CLI テスト          | 250–450 | remote fixture に対して決定的なplanを読み取り専用で出力する |
+
+receiptなしで存在するinstallはuntrackedとする。source宣言は完全一致またはcanonical manifestから計算した
+digestで比較し、aliasやprovider URLのsemantic identityを導入しない。公開CLIのsource情報がnullまたは
+曖昧な場合も、原因をprivate lockから推測せずconflict側へ閉じる。
 
 ## フェーズ 4: manifest 更新と remote apply
 
-| ID  | PR の責務                         | 主な成果物                               |    目安 | 完了条件                                                                    |
-| --- | --------------------------------- | ---------------------------------------- | ------: | --------------------------------------------------------------------------- |
-| M01 | 原子的な状態ファイル更新を移す    | directory lock、temp file、snapshot 比較 | 350–480 | 同時更新、mode 維持、途中失敗を unit test で検証する                        |
-| M02 | `add` を公開する                  | dry-run、`--yes`、remote entry 更新      | 250–450 | 全入力検証後だけ manifest を置換し、外部 install は行わない                 |
-| A01 | install 引数と process 境界を移す | shell を介さない runner、引数生成        | 250–450 | ref、skillPath、agent を配列引数で正しく渡す                                |
-| A02 | install 後の収束制御を移す        | install、再観測、失敗集約                | 300–450 | install 失敗時に prune せず、最終観測結果を返す                             |
-| A03 | prune なしの `apply` を公開する   | `--yes`、preflight、global lock          | 300–480 | container の fake CLI で remote install が収束し、再実行が unchanged になる |
-| M03 | desired の `remove` を公開する    | dry-run、`--yes`、manifest entry 除外    | 220–400 | workspace source やインストール済み内容を削除せず、manifest だけを更新する  |
+| ID  | PR の責務                           | 主な成果物                                     |    目安 | 完了条件                                                                 |
+| --- | ----------------------------------- | ---------------------------------------------- | ------: | ------------------------------------------------------------------------ |
+| M01 | 原子的な状態ファイル更新を実装する  | directory lock、temp file、snapshot 比較       | 350–480 | 同時更新、mode維持、途中失敗をunit testで検証する                        |
+| M02 | `add` を公開する                    | dry-run、`--yes`、remote entry更新             | 250–450 | 全入力検証後だけmanifestを置換し、外部installは行わない                  |
+| A01 | install 引数とprocess境界を実装する | shellを介さないrunner、opaque sourceと引数生成 | 250–400 | manifest宣言を解釈せず配列引数で正しく渡す                               |
+| A02 | 実行前intentを永続化する            | operation ID、事前観測、atomic write、recovery | 300–450 | process開始前に中断判定可能なintentが残る                                |
+| A03 | install後のreceiptを確定する        | install、再観測、fingerprint、receipt commit   | 300–450 | 一意なpostcondition確認後だけownershipを確定する                         |
+| A04 | pruneなしの `apply` を公開する      | `--yes`、preflight、process-wide apply lock    | 300–480 | fake CLIでremote installが収束し、中断後の再実行を安全に分類できる       |
+| M03 | desired の `remove` を公開する      | dry-run、`--yes`、manifest entry除外           | 220–400 | workspace sourceやインストール済み内容を削除せず、manifestだけを更新する |
 
 `add`、`remove` は desired state の編集、`apply` は observed state の変更として責務を分ける。
 
 ## フェーズ 5: prune
 
-| ID  | PR の責務                       | 主な成果物                          |    目安 | 完了条件                                               |
-| --- | ------------------------------- | ----------------------------------- | ------: | ------------------------------------------------------ |
-| D01 | remote 削除候補を安全に計画する | ownership guard、remove status      | 250–450 | untracked または復元不能な対象を remove にしない       |
-| D02 | 削除と再観測を移す              | remove runner、対象再確認、結果検証 | 300–450 | install が収束する前や対象が変化した後は削除しない     |
-| D03 | `apply --prune` を公開する      | 明示 flag、確認、統合テスト         | 250–450 | `--prune --yes` の組み合わせだけが隔離環境で削除を行う |
+| ID  | PR の責務                       | 主な成果物                               |    目安 | 完了条件                                                |
+| --- | ------------------------------- | ---------------------------------------- | ------: | ------------------------------------------------------- |
+| D01 | remote 削除候補を安全に計画する | receipt/fingerprint guard、remove status | 250–450 | untracked、drift、pending intentをremoveにしない        |
+| D02 | 削除と再観測を実装する          | remove intent、対象再確認、結果検証      | 300–450 | 対象が変化した後は削除せず、消失確認後だけreceiptを除く |
+| D03 | `apply --prune` を公開する      | 明示 flag、確認、統合テスト              | 250–450 | `--prune --yes` の組み合わせだけが隔離環境で削除を行う  |
 
 ## フェーズ 6: workspace Skill
 
@@ -99,50 +109,52 @@ remote entry に必要な検証がすべて有効になっていることを確�
 | W06 | projection を読み書きする                  | XDG state path、strict decode、private atomic write | 300–450 | 実 HOME を使わず、missing・競合・壊れた state を検証できる            |
 | W07 | インストールされた全 copy を検証する       | agent path 解決、symlink target、digest 比較        | 350–480 | canonical copy だけを信頼せず、観測可能な copy の一致を確認する       |
 | W08 | workspace の基本 plan を追加する           | install、unchanged、content update                  | 300–450 | desired tree と install tree の状態表テストが通る                     |
-| W09 | workspace の所有権 plan を追加する         | ownership conflict、unregistered、遷移              | 300–450 | manifest、projection、lock の曖昧な組み合わせを変更対象にしない       |
+| W09 | workspace の所有権 plan を追加する         | ownership conflict、unregistered、遷移              | 300–450 | manifest、receipt、projectionの曖昧な組み合わせを変更対象にしない     |
 | W10 | workspace install を追加する               | source 再検証、外部 CLI 引数、失敗集約              | 280–450 | plan 後に source が変わった場合、process 実行前に停止する             |
 | W11 | install 前の projection intent を記録する  | crash recovery、状態更新、失敗注入                  | 300–450 | 外部 process より前に再実行可能な所有権 intent が残る                 |
-| W12 | remote/workspace 遷移を検証する            | 再観測、provenance 確認、projection 除去            | 300–450 | remote の新しい所有権を確認する前に workspace 記録を捨てない          |
+| W12 | remote/workspace 遷移を検証する            | 再観測、receipt確定、projection 除去                | 300–450 | remote の新しい所有権を確認する前に workspace 記録を捨てない          |
 | W13 | workspace 削除後の状態を検証する           | prune 後の再観測、state cleanup                     | 300–450 | install が残る場合や対象が変わった場合は ownership を保持する         |
 | W14 | `doctor` と `plan` を workspace 対応にする | 警告、未登録 directory、JSON 出力                   | 220–400 | schema v2 の remote/workspace 混在 fixture を読み取り専用で診断できる |
-| W15 | workspace 対応 `apply` を公開する          | global lock、phase 結合、CLI test                   | 280–450 | 途中失敗から再実行でき、同じ workspace の再実行が収束する             |
+| W15 | workspace 対応 `apply` を公開する          | process-wide apply lock、phase結合、CLI test        | 280–450 | 途中失敗から再実行でき、同じ workspace の再実行が収束する             |
 
-W01 から W04 は、移行元の大きな `internal/workspace` を安全に分割するため別 PR とする。W15 が
-終わるまでは、workspace entry を含む `apply` を明示的に拒否する。
+W01からW04は、Skill treeの独立した安全契約を一つずつ固定するため別PRとする。W15が終わるまでは、
+workspace entryを含む `apply` を明示的に拒否する。remoteとworkspaceという二つのkindがそろうW15で、
+共通pipelineを維持したままkind固有のplan/apply処理だけをStrategyとして抽出する。providerやsource形式を
+Strategyのdispatch keyにしない。
 
 ## フェーズ 7: adopt
 
-| ID  | PR の責務                                 | 主な成果物                                   |    目安 | 完了条件                                                  |
-| --- | ----------------------------------------- | -------------------------------------------- | ------: | --------------------------------------------------------- |
-| T01 | installed Skill の採用方法を分類する      | provenance 判定、name 正規化、agent override | 280–430 | local/untracked と restorable remote を区別する           |
-| T02 | `adopt PATH` の copy 計画を移す           | source 検証、dry-run、staging copy           | 300–450 | destination 上書きや symlink を拒否し、まだ commit しない |
-| T03 | adopt 用 transaction を移す               | rename、snapshot 比較、rollback              | 300–450 | 失敗注入で manifest と tree の片方だけを commit しない    |
-| T04 | `adopt PATH` を公開する                   | CLI flag、projection 更新、統合テスト        | 280–450 | copy と ownership 記録が同じ隔離 transaction で完了する   |
-| T05 | `adopt --installed` の remote を公開する  | lock provenance、dry-run、manifest 更新      | 250–430 | 復元可能な remote だけを暗黙の既定値として採用する        |
-| T06 | `adopt --installed --as workspace` を公開 | local copy、projection transaction           | 300–450 | 明示指定なしに local Skill を Git 側へコピーしない        |
+| ID  | PR の責務                                 | 主な成果物                                    |    目安 | 完了条件                                                  |
+| --- | ----------------------------------------- | --------------------------------------------- | ------: | --------------------------------------------------------- |
+| T01 | installed Skill の採用入力を検証する      | kind、明示source、name正規化、agent override  | 280–430 | 推測せずremote/workspaceの採用要求を区別する              |
+| T02 | `adopt PATH` の copy 計画を移す           | source 検証、dry-run、staging copy            | 300–450 | destination 上書きや symlink を拒否し、まだ commit しない |
+| T03 | adopt 用 transaction を移す               | rename、snapshot 比較、rollback               | 300–450 | 失敗注入で manifest と tree の片方だけを commit しない    |
+| T04 | `adopt PATH` を公開する                   | CLI flag、projection 更新、統合テスト         | 280–450 | copy と ownership 記録が同じ隔離 transaction で完了する   |
+| T05 | `adopt --installed` の remote を公開する  | 明示source、fingerprint、manifest/receipt更新 | 250–430 | sourceを明示したuntracked remoteだけを採用する            |
+| T06 | `adopt --installed --as workspace` を公開 | local copy、projection transaction            | 300–450 | 明示指定なしに local Skill を Git 側へコピーしない        |
 
 ## フェーズ 8: v1 互換
 
-| ID  | PR の責務                     | 主な成果物                                   |    目安 | 完了条件                                               |
-| --- | ----------------------------- | -------------------------------------------- | ------: | ------------------------------------------------------ |
-| L01 | `migrate` を移す              | v1 読み取り、v2 candidate、dry-run、`--yes`  | 300–450 | workspace directory と衝突する場合は書き込まず停止する |
-| L02 | schema v1 の `capture` を移す | observed からの candidate、warning、競合検出 | 350–480 | schema v2 では拒否し、v1 fixture だけを更新できる      |
+| ID  | PR の責務                         | 主な成果物                                   |    目安 | 完了条件                                               |
+| --- | --------------------------------- | -------------------------------------------- | ------: | ------------------------------------------------------ |
+| L01 | `migrate` を移す                  | v1 読み取り、v2 candidate、dry-run、`--yes`  | 300–450 | workspace directory と衝突する場合は書き込まず停止する |
+| L02 | schema v1 の `capture` を実装する | 明示sourceを持つcandidate、warning、競合検出 | 350–480 | private lockを参照せず、v1 fixtureだけを更新できる     |
 
-## フェーズ 9: parity と切り替え
+## フェーズ 9: contract確認と切り替え
 
-| ID  | PR の責務                              | 主な成果物                                  |    目安 | 完了条件                                                  |
-| --- | -------------------------------------- | ------------------------------------------- | ------: | --------------------------------------------------------- |
-| F01 | cross-machine 相当の受け入れ試験を移す | machine fixture、capture/apply/prune の収束 | 300–480 | 端末状態を模した二つの隔離 root でシナリオが通る          |
-| F02 | CLI parity と配布物を確定する          | command matrix、container smoke、利用文書   | 250–450 | 合意済み差異以外の未移行コマンド・flag がない             |
-| F03 | 正式な切り替えを行う                   | release/cutover 手順、旧実装の参照終了条件  | 150–350 | 読み取り比較の承認後にのみ配布し、rollback 手順を確認する |
+| ID  | PR の責務                                 | 主な成果物                                  |    目安 | 完了条件                                                 |
+| --- | ----------------------------------------- | ------------------------------------------- | ------: | -------------------------------------------------------- |
+| F01 | cross-machine相当の受け入れ試験を実装する | machine fixture、receipt/apply/pruneの収束  | 300–480 | 端末状態を模した二つの隔離rootでシナリオが通る           |
+| F02 | CLI契約と配布物を確定する                 | command matrix、container smoke、利用文書   | 250–450 | 承認済みcontractに対する未実装command・flagがない        |
+| F03 | 正式な切り替えを行う                      | release/cutover手順、rollback参照の終了条件 | 150–350 | contract確認の承認後にのみ配布し、rollback手順を確認する |
 
-F03 まで `.worktrees/skills` は変更・削除しない。旧実装の除去が必要になった場合も、切り替え後の
-別 PR とする。
+F03まで `.worktrees/skills` は変更・削除しない。rollback参照を除去する場合も、切り替え後の別PRとする。
 
 ## 各 PR の共通チェックリスト
 
 - [ ] この PR が追加する利用者向けの振る舞いを一文で説明できる。
-- [ ] 移行元の基準コミットから参照した関数・テストを PR 本文へ記載した。
+- [ ] 承認済みの製品契約と、利用した外部CLIの公開境界をPR本文へ記載した。
+- [ ] private module、private source parser、private global lockに依存していない。
 - [ ] 未対応の入力を無視せず、明示的に拒否する。
 - [ ] 手書きによる非テスト実装の追加行＋削除行が 500 行以下である。
 - [ ] 実装と対応テストを同じ PR に含め、実装、テスト、fixture、生成物、文書を別集計した。
