@@ -59,22 +59,23 @@ inventoryにある約4,300行の実装と約4,590行のテストは、対象機�
 
 ## 製品契約
 
-実装の基準は、次の利用者向け契約と、固定した `skills` が公開するCLI境界とする。
+実装の基準は、次の利用者向け契約と、固定した `skills` が公開するCLI境界とする。CLIの具体的な
+grammar、flag、終了status、output schemaは[CLI契約](cli-contract.md)の承認済みentryだけを正本とする。
 
-| 領域           | 契約                                                                      | 検証                        |
-| -------------- | ------------------------------------------------------------------------- | --------------------------- |
-| CLI            | 合意したサブコマンド、主要フラグ、終了コード、出力の役割                  | black-box テスト            |
-| workspace 選択 | `--workspace`、環境変数、設定、カレントディレクトリの優先順               | table-driven test           |
-| manifest       | strict decode、schema、名前、opaqueなsource宣言、agent、決定的な出力      | fixture と unit test        |
-| 観測           | `skills --version` と `skills list -g --json`、installed treeを安全に読む | fake CLI と fixture         |
-| ownership      | intent、宣言digest、公開CLI観測、tree fingerprintをreceiptへ結び付ける    | 状態表と失敗注入            |
-| plan           | install、reconfigure、unchanged、conflict、untrackedなどを区別する        | 状態表テスト                |
-| apply          | intent記録後に実行し、再観測とreceipt確定後だけ成功とする                 | コンテナ統合テスト          |
-| prune          | 明示指定時だけ、receiptと現在のfingerprintが一致する対象を削除する        | 負のテストを含む統合テスト  |
-| workspace      | Skill ツリーの内容、実行 bit、symlink、パス、digest を検証する            | 一時ツリーのテスト          |
-| machine state  | receiptとprojectionをGit管理せず、競合しない原子的更新を行う              | 分離した XDG state のテスト |
-| adopt          | remoteのsource宣言とkindを明示させ、上書き前に停止する                    | dry-run と失敗系テスト      |
-| v1 互換        | 明示されたv1入力だけをschema v2の通常経路から分離して扱う                 | 互換 fixture                |
+| 領域           | 契約                                                                       | 検証                        |
+| -------------- | -------------------------------------------------------------------------- | --------------------------- |
+| CLI            | CLI契約で承認したcommand、全flag、終了status、stdout/stderr、output schema | black-box テスト            |
+| workspace 選択 | `--workspace`、環境変数、設定、カレントディレクトリの優先順                | table-driven test           |
+| manifest       | strict decode、schema、名前、opaqueなsource宣言、agent、決定的な出力       | fixture と unit test        |
+| 観測           | `skills --version` と `skills list -g --json`、installed treeを安全に読む  | fake CLI と fixture         |
+| ownership      | intent、宣言digest、公開CLI観測、tree fingerprintをreceiptへ結び付ける     | 状態表と失敗注入            |
+| plan           | install、reconfigure、unchanged、conflict、untrackedなどを区別する         | 状態表テスト                |
+| apply          | intent記録後に実行し、再観測とreceipt確定後だけ成功とする                  | コンテナ統合テスト          |
+| prune          | 明示指定時だけ、receiptと現在のfingerprintが一致する対象を削除する         | 負のテストを含む統合テスト  |
+| workspace      | Skill ツリーの内容、実行 bit、symlink、パス、digest を検証する             | 一時ツリーのテスト          |
+| machine state  | receiptとprojectionをGit管理せず、競合しない原子的更新を行う               | 分離した XDG state のテスト |
+| adopt          | remoteのsource宣言とkindを明示させ、上書き前に停止する                     | dry-run と失敗系テスト      |
+| v1 互換        | 明示されたv1入力だけをschema v2の通常経路から分離して扱う                  | 互換 fixture                |
 
 remote source は外部CLIへ渡す宣言全体をそのまま保持し、完全一致と宣言digestだけを比較する。
 `skills-reconcile` は空値、制御文字、credential、remote kindでのlocal pathなど、自身のmanifestと
@@ -128,6 +129,9 @@ Skill を変更せず、`skills-reconcile` を明示的に実行したときだ�
 Nix package の更新と無関係なGo、Node.js、`skills` の更新を同じPRに含めない。
 
 ## 機能の公開順
+
+各節のcommand名は実装範囲を示し、interfaceを定義しない。対応するCLI契約PRを先に承認し、そのentryを
+参照する実装PRだけがcommandを公開できる。CLI契約と実装を同じPRで新規決定しない。
 
 ### 読み取り専用
 

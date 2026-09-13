@@ -16,7 +16,8 @@ rollback 参照に限定し、その実装、テスト、出力を仕様また�
 
 ## 前提
 
-- 承認済みの製品契約は `docs/plan/**` を正本とする。
+- `docs/plan/**` で明示的に承認した製品契約だけを正本とする。ロードマップの責務名や将来command名は、
+  それだけではCLI grammar、flag、終了status、output schemaを定義しない。
 - `.worktrees/skills` のコミット `3c15f60` は、変更しない inventory と rollback 参照として固定する。
 - 移行先の開始点は、この計画作成時点の `main`、コミット `b6732ef` とする。
 - Go モジュール名は移行先に合わせて `github.com/y-writings/skills-reconcile` へ変更する。
@@ -27,7 +28,8 @@ rollback 参照に限定し、その実装、テスト、出力を仕様また�
   `flake.lock` で固定する。依存関係の更新は移行と同時に行わない。
 - `skills` について依存する契約は、固定versionが公開するCLI commandとmachine-readable outputに
   限定する。private module、private source parser、global lockの内部schemaには依存しない。
-- 機能 PR は直列にマージし、原則として未マージの機能 PR の上へ次の機能 PR を積まない。
+- 機能PRは直列mergeをdefaultとする。明示的にstackを使う場合は、rootを最新の成功した`main`に置き、
+  各layerを同じstack内の直前項目だけに依存させる。
 - 各 PR の手書きによる非テスト実装は、追加行と削除行の合計で 500 行以下にする。テスト、
   手書き fixture、生成物、文書は別集計する。
 
@@ -81,7 +83,8 @@ inventory の参照revisionは自動では動かさない。参照revisionの変
 2. まだ移していない入力やフラグは、無視せず「未対応」として失敗させる。
 3. 読み取り、追加・更新、削除の順序を守る。特に削除は `--prune` と明示確認を維持する。
 4. 実環境の `$HOME`、`XDG_CONFIG_HOME`、`XDG_STATE_HOME` をテストや開発コンテナへ渡さない。
-5. 各 PR は `main` へマージされた直前の PR だけに依存し、単独でビルド・テスト可能にする。
+5. regular PRは`main`へmergeされた直前項目だけに依存させる。明示的なstackでは同じstack内の直前
+   layerだけに依存させ、各PRをその直接のbaseに対してbuild・test可能にする。
 6. inventory のコードとテストは機能や依存関係の所在を調べる用途に限定する。そこから仕様、互換性、
    責務境界を推論しない。
 7. バグ修正または仕様変更が必要になった場合は、機能移行 PR に暗黙に混ぜない。
@@ -91,10 +94,13 @@ inventory の参照revisionは自動では動かさない。参照revisionの変
    well-known URL の解釈や意味的同一性を再実装しない。
 10. 外部 CLI の private lock を所有権の根拠にしない。書き込み前の intent と、成功後の公開CLI観測・
     installed tree fingerprintを結び付けたmachine-local receiptで所有権を記録する。
+11. 利用者向けcommandは、grammar、flag、終了status、stdout/stderr、machine-readable output、副作用を
+    [CLI契約](cli-contract.md)へ明記した文書PRを、対応する実装PRより先に承認する。
 
 ## 計画書の構成
 
 - [対象範囲と互換性](scope-and-compatibility.md): 実装対象、責務、機能ごとの完了条件
+- [CLI契約](cli-contract.md): 現在有効なinterfaceと、将来commandを実装可能にする承認条件
 - [PR ロードマップ](pr-roadmap.md): 実装 500 行以下を前提とした具体的なマージ順
 - [安全性と検証](safety-and-verification.md): コンテナ、CI、協業、切り替え、ロールバック
 

@@ -9,7 +9,9 @@ description: Advance exactly one skills-reconcile roadmap item from preflight th
 
 ## Outcome
 
-Start work on exactly one item in `docs/plan/pr-roadmap.md` from the latest successful `main`.
+Start work on exactly one item in `docs/plan/pr-roadmap.md`. For a regular pull request or the root of
+an explicitly requested stack, start from the latest successful `main`; for a later stack layer, start
+from the preceding item's branch in that same stack.
 On the green path, establish the destination contract, implement and verify the item, commit and
 push the branch, and create a pull request with the approved branch workflow. Never merge the pull request.
 
@@ -17,7 +19,8 @@ push the branch, and create a pull request with the approved branch workflow. Ne
 
 - Run this workflow only after explicit invocation. `agents/openai.yaml` disables implicit use.
 - Treat an item ID named by the user as the target. Otherwise determine the single next item from
-  roadmap order, repository state, and merged pull requests.
+  roadmap order, repository state, and merged pull requests, including open preceding layers when the
+  user explicitly requested a stack.
 - Choose the requested endpoint before entering the roadmap workflow:
   - a named verification runs only that check on the current checkout;
   - investigation stops after establishing and reporting the working contract;
@@ -38,10 +41,11 @@ Before continuing with the roadmap workflow, read:
 1. the repository-root `AGENTS.md`;
 2. `docs/plan/README.md`;
 3. `docs/plan/pr-roadmap.md`;
-4. `docs/plan/safety-and-verification.md`;
-5. `docs/plan/scope-and-compatibility.md`;
-6. the repository pull request template; and
-7. any item-specific documentation or instructions discovered from those files.
+4. `docs/plan/cli-contract.md`;
+5. `docs/plan/safety-and-verification.md`;
+6. `docs/plan/scope-and-compatibility.md`;
+7. the repository pull request template; and
+8. any item-specific documentation or instructions discovered from those files.
 
 Treat the approved plan and the pinned dependency's public boundary as `AGENTS.md` defines them.
 Inspect the migration inventory read-only to locate candidate capabilities and dependencies. Never use
@@ -54,10 +58,12 @@ machine state, credentials, or user-specific configuration into the destination.
    worktree status, remotes, and recent history.
 2. Preserve unrelated user changes. Do not stash, reset, discard, or incorporate them. Stop if they
    prevent an isolated change.
-3. When implementing an item, fetch the remote and confirm the local base equals the latest
-   successful `main`.
-4. When implementing or investigating an item, confirm the preceding roadmap item is merged and
-   there is no open feature pull request on which this item would depend.
+3. When implementing an item, fetch the remote. For a regular pull request or stack root, confirm the
+   base equals the latest successful `main`. For a later layer in an explicitly requested stack,
+   confirm the stack root has that base and the immediate base is the preceding item's branch.
+4. In a regular workflow, confirm the preceding roadmap item is merged and there is no open feature
+   pull request on which this item would depend. In an explicitly requested stack, confirm each open
+   dependency is an earlier layer of that same stack and follows roadmap order.
 5. When implementing or investigating an item, identify exactly one roadmap item. Stop if repository
    history and the roadmap do not identify one unambiguous next item.
 6. When implementing an item, create a new branch from that base. Use a stack only when the user has
@@ -88,7 +94,8 @@ meets all gates below. The commentary update is an audit trail, not a request fo
 
 Stop before commit, push, or pull request creation when any of these conditions appears:
 
-- source code, tests, or documentation disagree about the same input;
+- approved product contracts, current destination behavior, or a dependency's public boundary
+  disagree about the same input;
 - behavior appears defective or requires a bug fix, specification change, general refactor, or
   unrelated dependency update;
 - more than one roadmap item is needed for a buildable or testable change;
@@ -98,8 +105,9 @@ Stop before commit, push, or pull request creation when any of these conditions 
 - real HOME, XDG state, installed Skills, manifests, credentials, Docker socket, or other real user
   or workspace data would be required;
 - destructive ownership, deletion targets, or required test isolation cannot be proven;
-- the previous feature pull request is unmerged, `main` is failing, or a required verification path
-  remains unavailable or unresolved;
+- in a regular workflow the previous feature pull request is unmerged, or in an explicitly requested
+  stack the root or immediate-base relationship fails the preflight rules;
+- `main` is failing or a required verification path remains unavailable or unresolved;
 - the outgoing branch, commit, or pull request would expose private or machine-specific data; or
 - a choice would materially alter the approved scope or user-visible contract.
 
@@ -118,6 +126,8 @@ stop before implementation. Do not create a branch or change files, commits, or 
 
 - Implement the approved behavior in the destination's responsibility boundary. Preserve the
   destination CLI/module names and the dependency order in the plan.
+- For a user-facing command, implement only grammar, flags, status semantics, output, and side effects
+  already approved in `docs/plan/cli-contract.md`. A roadmap item name is not an interface contract.
 - Add synthetic fixtures and failure-path tests with the behavior. Keep unsupported inputs and flags
   explicit rather than silently accepting them.
 - Make the smallest reader-oriented change that satisfies the established contract. Do not add

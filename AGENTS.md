@@ -4,9 +4,13 @@
 
 ## Source of truth
 
-- Before migration work, read `docs/plan/README.md` and the plan document relevant to the task.
-- Treat the approved product contracts in `docs/plan/**` and the public CLI of the pinned `skills`
-  package as the implementation authority.
+- Before migration work, read `docs/plan/README.md`, `docs/plan/cli-contract.md`, and the plan document
+  relevant to the task.
+- Treat only behavior explicitly specified by the approved product contracts in `docs/plan/**`, plus
+  the public CLI of the pinned `skills` package, as implementation authority. A roadmap item name is
+  not a CLI grammar or output contract.
+- Do not implement a user-facing command until its complete entry in `docs/plan/cli-contract.md` has
+  been approved in an earlier documentation PR.
 - Treat `.worktrees/skills` at commit `3c15f60` as a read-only inventory and rollback reference. Do
   not use its implementation, tests, or output to justify a contract, and do not modify or delete it.
 - Do not import private modules from `skills`, reproduce its private source parser, or read its private
@@ -41,8 +45,9 @@
 
 ## Change and PR discipline
 
-- Start each feature PR from the latest successful `main`. Do not create stacked or otherwise
-  dependent feature PRs unless explicitly requested.
+- Start each regular feature PR and the root of a stack from the latest successful `main`. Create a
+  stack only when explicitly requested; each later layer must start from the preceding roadmap item's
+  branch in that stack.
 - Keep each PR buildable and testable. Include the tests and hand-written fixtures for a behavior in
   the same PR as its implementation.
 - Keep hand-written non-test implementation changes at or below 500 added-plus-deleted lines.
