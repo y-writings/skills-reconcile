@@ -10,20 +10,20 @@ mount しない。
 
 コンテナ内では、少なくとも次の値を専用の一時領域へ固定する。
 
-| 状態       | コンテナ内の例                     | host から引き継がないもの             |
-| ---------- | ---------------------------------- | ------------------------------------- |
-| HOME       | `/tmp/skills-reconcile-home`       | `$HOME/.agents` と agent ごとの Skill |
-| XDG config | `/tmp/skills-reconcile-xdg/config` | 実 workspace 設定                     |
-| XDG state  | `/tmp/skills-reconcile-xdg/state`  | `.skill-lock.json` と projection      |
-| XDG cache  | `/tmp/skills-reconcile-xdg/cache`  | npm や CLI の既存 cache               |
-| manifest   | テストごとの一時 workspace         | 移行元の `skills-manifest.json`       |
+| 状態       | コンテナ内の例                     | host から引き継がないもの                   |
+| ---------- | ---------------------------------- | ------------------------------------------- |
+| HOME       | `/tmp/skills-reconcile-home`       | `$HOME/.agents` と agent ごとの Skill       |
+| XDG config | `/tmp/skills-reconcile-xdg/config` | 実 workspace 設定                           |
+| XDG state  | `/tmp/skills-reconcile-xdg/state`  | 外部CLIのprivate state、receipt、projection |
+| XDG cache  | `/tmp/skills-reconcile-xdg/cache`  | npm や CLI の既存 cache                     |
+| manifest   | テストごとの一時 workspace         | 実運用の `skills-manifest.json`             |
 
 テストは開始時に空の一時 root を作り、終了時はコンテナごと破棄する。固定した `skills` CLI の
 install/remove を使う統合テストも、この root の外へ書き込めない構成にする。
 
 ## コンテナ方針
 
-- 移行元と同じ Go、Node.js、`skills` CLI のバージョンから開始する。
+- 計画で固定したGo、Node.js、`skills` CLIのversionを使う。
 - base image と GitHub Actions は移行先の既存方針に合わせて immutable な digest/SHA で固定する。
 - `npm ci --ignore-scripts` で lockfile から依存関係を再現する。
 - `SKILLS_RECONCILE_EXECUTABLE` はコンテナ内の固定済み executable だけを指す。
@@ -56,7 +56,7 @@ buildを実行し、利用対象となるDarwinについてもrunnerまたは合
 
 ### 1. Unit test
 
-manifest、lock、path、status、引数生成など、process や実 HOME を必要としない規則を検証する。
+manifest、receipt、path、status、引数生成など、processや実HOMEを必要としない規則を検証する。
 境界値と拒否すべき入力を table-driven test で表す。
 
 ### 2. Component test
@@ -68,14 +68,14 @@ manifest、lock、path、status、引数生成など、process や実 HOME を�
 
 合成した Skill/manifest と protocol を再現する fake CLI を使い、隔離 HOME 内で install、再実行、
 reconfigure、prune、adopt をネットワーク非依存で検証する。固定済みの実 `skills` CLI は、local fixture
-で再現できる範囲と `--version`、一覧形式の互換確認に使う。公開 remote へのアクセスは必須 CI に
+で再現できる範囲と `--version`、一覧形式のcontract確認に使う。公開 remote へのアクセスは必須 CI に
 しない。機能がまだ未移行なら、そのシナリオは追加しない。
 
 ### 4. Read-only shadow test
 
-切り替え直前に限り、利用者が明示的に選んだ実 workspace に対して新旧の `doctor` と `plan` を
-読み取り専用で実行し、正規化した結果を人が比較する。エージェントが実環境で `apply` や
-`--prune` を自動実行しない。
+切り替え直前に限り、利用者が明示的に選んだ実workspaceに対して新しい `doctor` と `plan` を
+読み取り専用で実行し、承認済みcontractと照合する。inventory側の出力を期待値にしない。
+エージェントが実環境で `apply` や `--prune` を自動実行しない。
 
 ## GitHub Actions
 
@@ -144,18 +144,22 @@ manifest 書き換えを行わない。配布が必要になる F03 は、テス
 
 1. ロードマップから次の一項目だけを選ぶ。
 2. 実装前に、入力、期待する出力、副作用、未対応範囲を短い作業メモとして整理する。
-3. 移行元の該当コードとテストを確認し、採用する契約を列挙する。
+3. 承認済みの製品契約と、利用する外部dependencyの公開境界を列挙する。利用者向けcommandでは、
+   対応する[CLI契約](cli-contract.md)のentryが先行PRで承認済みであることも確認する。openなstack
+   layerの場合は、現在headへのmaintainer明示承認と、依存PR本文に記録する証跡を確認する。
 4. 合成 fixture と失敗系テストを先に用意し、コンテナで対象範囲だけを反復する。
 5. 対象の振る舞いを移し、全テストを実行して、差分内訳、500行制限、禁止対象を確認する。
-6. 必須のローカル検証がすべて成功し、未解決の仕様判断がない場合だけ通常の PR を作成する。
+6. 必須のローカル検証がすべて成功し、未解決の仕様判断がない場合だけ承認されたregularまたは
+   stacked PR workflowでPRを作成する。
 7. PR 本文で、作業メモの契約、差分、実測行数、検証結果、意図的な未対応範囲を一緒に確認する。
 8. CI とレビューが完了してから人が squash merge し、ロードマップへ実測と引き継ぎを反映する。
 9. `main` の成功を確認してから次の機能に着手する。
 
-この流れにより、仕様判断が必要な箇所を実装前または小さな差分の段階で相談できる。バグらしき
-挙動を PR 作成前に発見した場合は、commit、push、PR 作成を行わず、[対象範囲と互換性](scope-and-compatibility.md)
-の判断情報を提示する。PR 作成後の CI またはレビューで発見した場合は、通常の PR を open のまま残し、
-merge せずに同じ情報を提示する。いずれも指示があるまで当該機能の公開を進めない。
+この流れにより、仕様判断が必要な箇所を実装前または小さな差分の段階で相談できる。承認済み契約と
+外部dependencyの公開動作が両立しない場合は、PR作成前ならcommit、push、PR作成を行わず、
+[対象範囲と互換性](scope-and-compatibility.md)の判断情報を提示する。PR作成後のCIまたはレビューで
+見つかった場合は、PRをopenのまま残してmergeせず、同じ情報を提示する。指示があるまで当該機能の
+公開を進めない。
 
 ## PR の停止条件
 
@@ -166,17 +170,21 @@ merge せずに同じ情報を提示する。いずれも指示があるまで�
 - 手書き総差分が 1,000 行を超え、分割要否をレビューしていない。
 - 既存機能の仕様変更が、対象機能の移行に混ざった。
 - 実 HOME、実 Skill、実 manifest、認証情報がテストに必要になった。
-- 移行元のコード、テスト、README が同じ入力に異なる期待値を示した。
+- 承認済みの製品契約と固定dependencyの公開動作を同時に満たせない。
 - 削除対象または workspace 所有権を、観測状態から一意に証明できない。
-- 前の PR が未マージまたは `main` の CI が失敗している。
+- regular PRで前のPRが未merge、またはexplicitなstackのrootが最新の成功した`main`に基づかない。
+- explicitなstackで、対象項目の直接のbaseが先行項目のbranchでない、または各layerを直接のbaseに
+  対してbuild・testできない。
+- 利用者向けcommandの実装または変更に、先に承認された完全なCLI契約entryがない。openな契約PRでは、
+  maintainerが現在のhead commitを明示承認していない、または依存PR本文に承認証跡がない場合も含む。
 - コンテナと CI で結果が一致しない。
 
 ## 切り替え手順
 
 1. F01 までの合成環境テストをすべて成功させる。
-2. コマンド・flag・status・出力形式の parity 表を完成させる。
-3. 新旧をそれぞれ同じ manifest snapshot と観測 snapshot に対して読み取り専用で実行する。
-4. 差分を「合意済み」「未解決」に分類し、未解決をゼロにする。
+2. コマンド、flag、status、出力形式のcontract表を完成させる。
+3. 合成したmanifest、公開CLI観測、receipt snapshotに対して読み取り専用で実行する。
+4. contract表の未実装または未判断項目をゼロにする。
 5. 実 workspace では `doctor`、次に `plan` だけを実行し、結果を人が承認する。
 6. 独立した F03 PR で build・配布・利用文書を確定する。
 7. 新実装による最初の書き込み操作は prune なしで行い、再度 `plan` して収束を確認する。
@@ -185,9 +193,9 @@ merge せずに同じ情報を提示する。いずれも指示があるまで�
 ## ロールバック
 
 - 機能移行中は、問題のある最新 PR を revert し、直前の `main` へ戻す。
-- 移行元 `.worktrees/skills` は F03 完了まで変更しないため、比較と読み取り専用運用に使える。
-- 移行先を配布しても、旧実装を即座に削除しない。少なくとも最初の install と再 plan が収束する
-  までは旧実装の基準コミットを保持する。
-- 外部 install が一部成功した場合は、無条件の逆操作をしない。新旧いずれかの `plan` と観測状態を
-  保存し、所有権を確認してから再実行または手動復旧を選ぶ。
-- prune 後の自動復元は計画しない。削除前レビューと manifest/lock の provenance を復旧根拠にする。
+- `.worktrees/skills` はF03完了まで変更せず、切り替え失敗時のrollback参照としてだけ保持する。
+- 移行先を配布してもrollback経路を即座に削除しない。少なくとも最初のinstallと再planが収束する
+  までは固定したrollback参照を保持する。
+- 外部installが一部成功した場合は、無条件の逆操作をしない。intent、公開CLI観測、receipt、tree
+  fingerprintを保存し、所有権を確認してから再実行または手動復旧を選ぶ。
+- prune後の自動復元は計画しない。削除前レビューと確定済みreceiptを復旧判断の根拠にする。
