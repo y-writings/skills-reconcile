@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -265,6 +266,10 @@ func validHostedRepositoryPart(part string) bool {
 func supportedRepositoryURLScheme(scheme string) bool {
 	return scheme == "http" || scheme == "https" || scheme == "ssh"
 }
+func validRemotePort(parsed *url.URL) bool {
+	port, err := strconv.ParseUint(parsed.Port(), 10, 16)
+	return parsed.Port() == "" || (err == nil && port != 0)
+}
 func plainRepositoryURL(source string, parsed *url.URL, hostname string) bool {
 	return !strings.ContainsAny(source, "?#") &&
 		parsed.Hostname() == hostname &&
@@ -290,7 +295,7 @@ func parseWellKnownURL(source string) (*url.URL, bool) {
 		return nil, false
 	}
 	parsed, err := url.Parse(source)
-	if err != nil || parsed.Hostname() == "" || parsed.User != nil || strings.HasSuffix(source, ".git") ||
+	if err != nil || parsed.Hostname() == "" || !validRemotePort(parsed) || parsed.User != nil || strings.HasSuffix(source, ".git") ||
 		reservedWellKnownHost(parsed.Hostname()) || sourceSelectsDifferentProvider(source, parsed) {
 		return nil, false
 	}
@@ -313,7 +318,7 @@ func validGenericGitSource(source string) bool {
 		return false
 	}
 	parsed, err := url.Parse(source)
-	if err == nil && parsed.Hostname() != "" {
+	if err == nil && parsed.Hostname() != "" && validRemotePort(parsed) {
 		if sourceSelectsDifferentProvider(source, parsed) {
 			return false
 		}
