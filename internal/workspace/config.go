@@ -35,23 +35,18 @@ func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error)
 }
 
 func decodeWorkspaceConfig(data []byte) (workspaceDir string, found bool, err error) {
-	if jsondoc.Validate(data) != nil {
+	var config struct {
+		Workspace json.RawMessage `json:"workspace"`
+	}
+	unknownFields, err := jsondoc.DecodeObject(data, &config, "workspace")
+	if err != nil || len(unknownFields) != 0 {
 		return "", false, errInvalidConfig
 	}
-
-	var config map[string]json.RawMessage
-	if json.Unmarshal(data, &config) != nil || config == nil {
-		return "", false, errInvalidConfig
-	}
-	if len(config) == 0 {
+	if config.Workspace == nil {
 		return "", false, nil
 	}
-	workspaceValue, found := config["workspace"]
-	if len(config) != 1 || !found {
-		return "", false, errInvalidConfig
-	}
 	var workspace *string
-	if json.Unmarshal(workspaceValue, &workspace) != nil || workspace == nil {
+	if json.Unmarshal(config.Workspace, &workspace) != nil || workspace == nil {
 		return "", false, errInvalidConfig
 	}
 	if *workspace == "" {
