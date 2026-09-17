@@ -27,7 +27,6 @@ func TestDecodeWorkspaceConfigRejectsInvalidConfig(t *testing.T) {
 		{"null workspace", `{"workspace":null}`},
 		{"wrong workspace type", `{"workspace":42}`},
 		{"unknown field", `{"workpace":"/workspace"}`},
-		{"case variant", `{"workspace":"/workspace","Workspace":"/other"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			workspaceDir, found, err := decodeWorkspaceConfig([]byte(tc.data))

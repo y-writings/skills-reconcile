@@ -50,8 +50,7 @@ Goの直接build、Nix package、開発コンテナを同じCLI契約に対し�
 | --- | -------------------------------------------- | ---------------------------------------------------------- | -------: | ------------------------------------------------------------ |
 | C01 | workspace と manifest の場所を解決する       | 優先順位、絶対パス検証、設定 fixture                       |  250–450 | flag、環境変数、設定、cwd の各経路を副作用なしで検証できる   |
 | J01 | JSON 文書の完全性を共通化する                | UTF-8、単一値、全階層の重複 member 拒否                    |   50–100 | workspace と後続 reader が同じ事前検証を利用できる           |
-| J02 | canonical object decodeを共通化する          | object必須、known fieldのcase alias拒否                    |    50–90 | unknown field policyをcallerに残して型decodeできる           |
-| C02 | workspace設定をforward compatibleにする      | canonicalな`workspace`、unknown field許容                  |    20–50 | 将来fieldと既存workspace設定を同時に読み取れる               |
+| J02 | strict object decodeを共通化する             | object必須、canonical field以外の拒否                      |    50–90 | 明示的なJSON tagと完全一致するfieldだけを型decodeできる      |
 | C03 | 公開された `skills` CLI を観測する           | version確認、global list decode、agent正規化、fake process |  300–450 | private lockを読まず、CLI失敗と曖昧な一覧を区別できる        |
 | C04 | manifest のモデルと strict decode を実装する | schema 型、未知 field・trailing JSON の拒否                |  250–400 | 合成 manifest を読み取れ、ファイル更新はまだ行わない         |
 | C05 | schema、default、名前を検証する              | version、agent、install name の規則                        |  250–430 | schema と名前衝突を実行前に拒否できる                        |
@@ -59,8 +58,9 @@ Goの直接build、Nix package、開発コンテナを同じCLI契約に対し�
 | K01 | `doctor` のCLI契約を承認する                 | grammar、flag、終了status、text/JSON schema                | 文書のみ | C07が参照する完全なinterfaceがCLI契約へ登録される            |
 | C07 | remote 範囲の `doctor` を公開する            | 入力・公開CLI観測の診断、CLI テスト                        |  250–450 | container fixture に対して読み取り専用で成功・失敗を説明する |
 
-J01はUTF-8、単一のJSON値、全階層の重複member拒否だけを共有する。J02はobject必須とknown fieldの
-canonical spellingを共有し、unknown field、型、null、domainのpolicyは各readerに残す。C03が依存するのは
+J01はUTF-8、単一のJSON値、全階層の重複member拒否だけを共有する。J02はobject必須とdestinationの明示的な
+JSON tagに完全一致しないtop-level fieldの拒否を共有し、fieldの必須性、型、null、domainのpolicyは
+各readerに残す。C03が依存するのは
 固定した `skills` の公開commandとmachine-readable outputだけとし、private module、private source parser、
 global lockのpathまたはschemaを実装しない。C06はsourceをopaqueな実行宣言として保持し、外部CLIが
 受理するprovider構文や異なる表記の意味的同一性を判定しない。

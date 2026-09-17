@@ -4,52 +4,73 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 )
 
-// ObjectSchema describes a product-owned JSON object and its canonical field names.
-type ObjectSchema interface {
-	CanonicalFieldNames() []string
-}
-
-// DecodeObject decodes one object into destination, rejects case aliases of
-// its canonical fields, and reports other fields in sorted order for caller policy.
-func DecodeObject[T ObjectSchema](data []byte, destination *T) ([]string, error) {
+// DecodeObject decodes one object into a struct whose explicit JSON field names
+// define the complete set of accepted top-level fields.
+func DecodeObject[T any](data []byte, destination *T) error {
 	if destination == nil {
-		return nil, errors.New("JSON destination must not be nil")
+		return errors.New("JSON destination must not be nil")
 	}
 	if err := Validate(data); err != nil {
-		return nil, err
+		return err
 	}
 
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(data, &object); err != nil || object == nil {
-		return nil, errors.New("JSON value must be an object")
+		return errors.New("JSON value must be an object")
 	}
 
-	canonicalFields := (*destination).CanonicalFieldNames()
-	canonical := make(map[string]struct{}, len(canonicalFields))
-	for _, field := range canonicalFields {
-		canonical[field] = struct{}{}
+	canonicalFields, err := objectFieldNames(reflect.TypeFor[T]())
+	if err != nil {
+		return err
 	}
-
-	unknownFields := make([]string, 0)
+	objectFields := make([]string, 0, len(object))
 	for field := range object {
-		if _, known := canonical[field]; known {
+		objectFields = append(objectFields, field)
+	}
+	sort.Strings(objectFields)
+	for _, field := range objectFields {
+		if _, known := canonicalFields[field]; !known {
+			return fmt.Errorf("unknown JSON field %q", field)
+		}
+	}
+
+	return json.Unmarshal(data, destination)
+}
+
+func objectFieldNames(destinationType reflect.Type) (map[string]struct{}, error) {
+	if destinationType.Kind() != reflect.Struct {
+		return nil, errors.New("JSON destination must point to a struct")
+	}
+	jsonUnmarshalerType := reflect.TypeFor[json.Unmarshaler]()
+	if destinationType.Implements(jsonUnmarshalerType) || reflect.PointerTo(destinationType).Implements(jsonUnmarshalerType) {
+		return nil, errors.New("JSON destination must not implement json.Unmarshaler")
+	}
+
+	canonicalFields := make(map[string]struct{}, destinationType.NumField())
+	for index := range destinationType.NumField() {
+		field := destinationType.Field(index)
+		if field.Anonymous {
+			return nil, fmt.Errorf("JSON destination field %q must not be embedded", field.Name)
+		}
+		if !field.IsExported() {
 			continue
 		}
-		for _, canonicalField := range canonicalFields {
-			if strings.EqualFold(field, canonicalField) {
-				return nil, fmt.Errorf("JSON field %q must use canonical spelling %q", field, canonicalField)
+		tag, exists := field.Tag.Lookup("json")
+		name, _, hasOptions := strings.Cut(tag, ",")
+		if !exists || name == "" || name == "-" || hasOptions {
+			return nil, fmt.Errorf("JSON destination field %q must have one explicit JSON name", field.Name)
+		}
+		for canonicalField := range canonicalFields {
+			if strings.EqualFold(name, canonicalField) {
+				return nil, fmt.Errorf("JSON destination fields %q and %q conflict", canonicalField, name)
 			}
 		}
-		unknownFields = append(unknownFields, field)
+		canonicalFields[name] = struct{}{}
 	}
-
-	if err := json.Unmarshal(data, destination); err != nil {
-		return nil, err
-	}
-	sort.Strings(unknownFields)
-	return unknownFields, nil
+	return canonicalFields, nil
 }

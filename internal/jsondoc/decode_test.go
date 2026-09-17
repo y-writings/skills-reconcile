@@ -1,43 +1,46 @@
 package jsondoc
 
 import (
-	"slices"
+	"encoding/json"
+	"reflect"
 	"testing"
 )
 
 type objectFixture struct {
-	Workspace *string `json:"workspace"`
+	Directory *string `json:"workspace"`
 }
 
-func (objectFixture) CanonicalFieldNames() []string {
-	return []string{"workspace"}
+type rawObjectFixture struct {
+	Value json.RawMessage `json:"value"`
 }
 
-func TestDecodeObjectDecodesCanonicalFieldsAndReportsUnknownFields(t *testing.T) {
+type customObjectFixture struct {
+	Value string `json:"value"`
+}
+
+func (*customObjectFixture) UnmarshalJSON([]byte) error {
+	return nil
+}
+
+func TestDecodeObjectDecodesCanonicalFields(t *testing.T) {
 	var got objectFixture
-	unknownFields, err := DecodeObject(
-		[]byte(`{"future":true,"workspace":"/workspace","another":42}`),
-		&got,
-	)
-	if err != nil {
+	if err := DecodeObject([]byte(`{"workspace":"/workspace"}`), &got); err != nil {
 		t.Fatalf("DecodeObject() error = %v, want nil", err)
 	}
-	if got.Workspace == nil {
+	if got.Directory == nil {
 		t.Fatal("decoded workspace = nil, want a value")
 	}
-	if *got.Workspace != "/workspace" {
-		t.Fatalf("decoded workspace = %q, want %q", *got.Workspace, "/workspace")
-	}
-	if want := []string{"another", "future"}; !slices.Equal(unknownFields, want) {
-		t.Fatalf("unknown fields = %q, want %q", unknownFields, want)
+	if *got.Directory != "/workspace" {
+		t.Fatalf("decoded workspace = %q, want %q", *got.Directory, "/workspace")
 	}
 }
 
-func TestDecodeObjectLeavesNullPolicyToCaller(t *testing.T) {
-	var got objectFixture
-	unknownFields, err := DecodeObject([]byte(`{"workspace":null}`), &got)
-	if err != nil || got.Workspace != nil || len(unknownFields) != 0 {
-		t.Fatalf("DecodeObject() = (%v, %q, %v), want (nil, [], nil)", got.Workspace, unknownFields, err)
+func TestDecodeObjectLeavesPresenceAndNullPolicyToCaller(t *testing.T) {
+	for _, data := range []string{`{}`, `{"workspace":null}`} {
+		var got objectFixture
+		if err := DecodeObject([]byte(data), &got); err != nil || got.Directory != nil {
+			t.Fatalf("DecodeObject(%s) = (%v, %v), want (nil, nil)", data, got.Directory, err)
+		}
 	}
 }
 
@@ -51,50 +54,110 @@ func TestDecodeObjectRejectsNonObjectRoots(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var got objectFixture
-			if _, err := DecodeObject([]byte(tc.data), &got); err == nil {
+			if err := DecodeObject([]byte(tc.data), &got); err == nil {
 				t.Fatal("DecodeObject() error = nil, want non-object rejection")
 			}
 		})
 	}
 }
 
-func TestDecodeObjectRejectsKnownFieldCaseAliases(t *testing.T) {
+func TestDecodeObjectRejectsFieldsOutsideCanonicalSet(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		data string
 	}{
+		{"unrelated field", `{"future":true}`},
 		{"alias only", `{"Workspace":"/other"}`},
 		{"canonical and alias", `{"workspace":"/workspace","WORKSPACE":"/other"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var got objectFixture
-			if _, err := DecodeObject([]byte(tc.data), &got); err == nil {
-				t.Fatal("DecodeObject() error = nil, want case-alias rejection")
+			if err := DecodeObject([]byte(tc.data), &got); err == nil {
+				t.Fatal("DecodeObject() error = nil, want unknown-field rejection")
 			}
 		})
 	}
 }
 
 func TestDecodeObjectUsesDocumentIntegrityValidation(t *testing.T) {
-	var got objectFixture
-	if _, err := DecodeObject(
-		[]byte(`{"workspace":"/first","workspace":"/second"}`),
-		&got,
-	); err == nil {
+	var got rawObjectFixture
+	if err := DecodeObject([]byte(`{"value":{"x":1,"x":2}}`), &got); err == nil {
 		t.Fatal("DecodeObject() error = nil, want duplicate-field rejection")
 	}
 }
 
 func TestDecodeObjectReturnsTypedDecodeErrors(t *testing.T) {
 	var got objectFixture
-	if _, err := DecodeObject([]byte(`{"workspace":42}`), &got); err == nil {
+	if err := DecodeObject([]byte(`{"workspace":42}`), &got); err == nil {
 		t.Fatal("DecodeObject() error = nil, want field-type rejection")
 	}
 }
 
-func TestDecodeObjectRejectsNilDestination(t *testing.T) {
-	var destination *objectFixture
-	if _, err := DecodeObject([]byte(`{}`), destination); err == nil {
-		t.Fatal("DecodeObject() error = nil, want nil destination rejection")
+func TestDecodeObjectRejectsInvalidDestinations(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		decode func() error
+	}{
+		{"nil pointer", func() error {
+			var destination *objectFixture
+			return DecodeObject([]byte(`{}`), destination)
+		}},
+		{"non-struct", func() error {
+			var destination string
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+		{"missing tag", func() error {
+			var destination struct{ Value string }
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+		{"case-conflicting tags", func() error {
+			var destination struct {
+				Lower string `json:"value"`
+				Upper string `json:"VALUE"`
+			}
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+		{"embedded field", func() error {
+			var destination struct{ objectFixture }
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+		{"empty tag name", func() error {
+			var destination struct {
+				Value string `json:""`
+			}
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+		{"ignored field", func() error {
+			var destination struct {
+				Value string `json:"-"`
+			}
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+		{"tag option", func() error {
+			var destination struct {
+				Value string `json:"value,omitempty"`
+			}
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+		{"custom unmarshal", func() error {
+			var destination customObjectFixture
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.decode(); err == nil {
+				t.Fatal("DecodeObject() error = nil, want invalid-destination rejection")
+			}
+		})
+	}
+}
+
+func TestObjectFieldNamesRejectsDuplicateTags(t *testing.T) {
+	destinationType := reflect.StructOf([]reflect.StructField{
+		{Name: "First", Type: reflect.TypeFor[string](), Tag: `json:"value"`},
+		{Name: "Second", Type: reflect.TypeFor[string](), Tag: `json:"value"`},
+	})
+	if _, err := objectFieldNames(destinationType); err == nil {
+		t.Fatal("objectFieldNames() error = nil, want duplicate-tag rejection")
 	}
 }

@@ -77,6 +77,9 @@ grammar、flag、終了status、output schemaは[CLI契約](cli-contract.md)の�
 | adopt          | remoteのsource宣言とkindを明示させ、上書き前に停止する                     | dry-run と失敗系テスト      |
 | v1 互換        | 明示されたv1入力だけをschema v2の通常経路から分離して扱う                  | 互換 fixture                |
 
+workspace configはtop-level objectとし、正確な`workspace`fieldだけを許可する。未知field、case alias、
+重複member、`null`、文字列以外の値を拒否する。空objectと空の`workspace`は未設定として扱う。
+
 remote source は外部CLIへ渡す宣言全体をそのまま保持し、完全一致と宣言digestだけを比較する。
 `skills-reconcile` は空値、制御文字、credential、remote kindでのlocal pathなど、自身のmanifestと
 実行安全性に属する規則だけを検証する。provider、alias、SCP、port、well-known URLの構文、または異なる
