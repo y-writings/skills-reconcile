@@ -12,6 +12,12 @@ import (
 
 var errInvalidConfig = errors.New("invalid skills-reconcile config")
 
+type workspaceConfig struct {
+	Workspace json.RawMessage `json:"workspace"`
+}
+
+func (workspaceConfig) StrictJSONObjectSchema() {}
+
 func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error) {
 	configHome := os.Getenv(envvars.XDGConfigHome)
 	if configHome == "" {
@@ -35,9 +41,7 @@ func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error)
 }
 
 func decodeWorkspaceConfig(data []byte) (workspaceDir string, found bool, err error) {
-	var config struct {
-		Workspace json.RawMessage `json:"workspace"`
-	}
+	var config workspaceConfig
 	if jsondoc.DecodeObject(data, &config) != nil {
 		return "", false, errInvalidConfig
 	}

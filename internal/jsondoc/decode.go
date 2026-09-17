@@ -9,9 +9,14 @@ import (
 	"strings"
 )
 
+// StrictObjectSchema marks product-owned schemas for strict top-level JSON objects.
+type StrictObjectSchema interface {
+	StrictJSONObjectSchema()
+}
+
 // DecodeObject decodes one object into a struct whose explicit JSON field names
 // define the complete set of accepted top-level fields.
-func DecodeObject[T any](data []byte, destination *T) error {
+func DecodeObject[T StrictObjectSchema](data []byte, destination *T) error {
 	if destination == nil {
 		return errors.New("JSON destination must not be nil")
 	}
@@ -62,8 +67,8 @@ func objectFieldNames(destinationType reflect.Type) (map[string]struct{}, error)
 		}
 		tag, exists := field.Tag.Lookup("json")
 		name, _, hasOptions := strings.Cut(tag, ",")
-		if !exists || name == "" || name == "-" || hasOptions {
-			return nil, fmt.Errorf("JSON destination field %q must have one explicit JSON name", field.Name)
+		if !exists || !isProductJSONFieldName(name) || hasOptions {
+			return nil, fmt.Errorf("JSON destination field %q must have one explicit lowercase-initial ASCII alphanumeric JSON name", field.Name)
 		}
 		for canonicalField := range canonicalFields {
 			if strings.EqualFold(name, canonicalField) {
@@ -73,4 +78,19 @@ func objectFieldNames(destinationType reflect.Type) (map[string]struct{}, error)
 		canonicalFields[name] = struct{}{}
 	}
 	return canonicalFields, nil
+}
+
+func isProductJSONFieldName(name string) bool {
+	if name == "" || name[0] < 'a' || name[0] > 'z' {
+		return false
+	}
+	for _, character := range []byte(name[1:]) {
+		if character >= 'a' && character <= 'z' ||
+			character >= 'A' && character <= 'Z' ||
+			character >= '0' && character <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
 }

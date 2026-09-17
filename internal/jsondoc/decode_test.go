@@ -7,7 +7,7 @@ import (
 )
 
 type objectFixture struct {
-	Directory *string `json:"workspace"`
+	Version *string `json:"schemaVersion"`
 }
 
 type rawObjectFixture struct {
@@ -18,28 +18,44 @@ type customObjectFixture struct {
 	Value string `json:"value"`
 }
 
+type invalidTagFixture struct {
+	Value string `json:"foo\\bar"`
+}
+
+type scalarFixture string
+
+func (objectFixture) StrictJSONObjectSchema() {}
+
+func (rawObjectFixture) StrictJSONObjectSchema() {}
+
+func (customObjectFixture) StrictJSONObjectSchema() {}
+
+func (invalidTagFixture) StrictJSONObjectSchema() {}
+
+func (scalarFixture) StrictJSONObjectSchema() {}
+
 func (*customObjectFixture) UnmarshalJSON([]byte) error {
 	return nil
 }
 
 func TestDecodeObjectDecodesCanonicalFields(t *testing.T) {
 	var got objectFixture
-	if err := DecodeObject([]byte(`{"workspace":"/workspace"}`), &got); err != nil {
+	if err := DecodeObject([]byte(`{"schemaVersion":"v2"}`), &got); err != nil {
 		t.Fatalf("DecodeObject() error = %v, want nil", err)
 	}
-	if got.Directory == nil {
-		t.Fatal("decoded workspace = nil, want a value")
+	if got.Version == nil {
+		t.Fatal("decoded schemaVersion = nil, want a value")
 	}
-	if *got.Directory != "/workspace" {
-		t.Fatalf("decoded workspace = %q, want %q", *got.Directory, "/workspace")
+	if *got.Version != "v2" {
+		t.Fatalf("decoded schemaVersion = %q, want %q", *got.Version, "v2")
 	}
 }
 
 func TestDecodeObjectLeavesPresenceAndNullPolicyToCaller(t *testing.T) {
-	for _, data := range []string{`{}`, `{"workspace":null}`} {
+	for _, data := range []string{`{}`, `{"schemaVersion":null}`} {
 		var got objectFixture
-		if err := DecodeObject([]byte(data), &got); err != nil || got.Directory != nil {
-			t.Fatalf("DecodeObject(%s) = (%v, %v), want (nil, nil)", data, got.Directory, err)
+		if err := DecodeObject([]byte(data), &got); err != nil || got.Version != nil {
+			t.Fatalf("DecodeObject(%s) = (%v, %v), want (nil, nil)", data, got.Version, err)
 		}
 	}
 }
@@ -67,8 +83,8 @@ func TestDecodeObjectRejectsFieldsOutsideCanonicalSet(t *testing.T) {
 		data string
 	}{
 		{"unrelated field", `{"future":true}`},
-		{"alias only", `{"Workspace":"/other"}`},
-		{"canonical and alias", `{"workspace":"/workspace","WORKSPACE":"/other"}`},
+		{"alias only", `{"SchemaVersion":"v2"}`},
+		{"canonical and alias", `{"schemaVersion":"v2","SCHEMAVERSION":"other"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var got objectFixture
@@ -88,7 +104,7 @@ func TestDecodeObjectUsesDocumentIntegrityValidation(t *testing.T) {
 
 func TestDecodeObjectReturnsTypedDecodeErrors(t *testing.T) {
 	var got objectFixture
-	if err := DecodeObject([]byte(`{"workspace":42}`), &got); err == nil {
+	if err := DecodeObject([]byte(`{"schemaVersion":42}`), &got); err == nil {
 		t.Fatal("DecodeObject() error = nil, want field-type rejection")
 	}
 }
@@ -103,41 +119,12 @@ func TestDecodeObjectRejectsInvalidDestinations(t *testing.T) {
 			return DecodeObject([]byte(`{}`), destination)
 		}},
 		{"non-struct", func() error {
-			var destination string
+			var destination scalarFixture
 			return DecodeObject([]byte(`{}`), &destination)
 		}},
-		{"missing tag", func() error {
-			var destination struct{ Value string }
-			return DecodeObject([]byte(`{}`), &destination)
-		}},
-		{"case-conflicting tags", func() error {
-			var destination struct {
-				Lower string `json:"value"`
-				Upper string `json:"VALUE"`
-			}
-			return DecodeObject([]byte(`{}`), &destination)
-		}},
-		{"embedded field", func() error {
-			var destination struct{ objectFixture }
-			return DecodeObject([]byte(`{}`), &destination)
-		}},
-		{"empty tag name", func() error {
-			var destination struct {
-				Value string `json:""`
-			}
-			return DecodeObject([]byte(`{}`), &destination)
-		}},
-		{"ignored field", func() error {
-			var destination struct {
-				Value string `json:"-"`
-			}
-			return DecodeObject([]byte(`{}`), &destination)
-		}},
-		{"tag option", func() error {
-			var destination struct {
-				Value string `json:"value,omitempty"`
-			}
-			return DecodeObject([]byte(`{}`), &destination)
+		{"invalid tag name", func() error {
+			var destination invalidTagFixture
+			return DecodeObject([]byte(`{"foo\\bar":"decoded"}`), &destination)
 		}},
 		{"custom unmarshal", func() error {
 			var destination customObjectFixture
@@ -152,12 +139,41 @@ func TestDecodeObjectRejectsInvalidDestinations(t *testing.T) {
 	}
 }
 
-func TestObjectFieldNamesRejectsDuplicateTags(t *testing.T) {
-	destinationType := reflect.StructOf([]reflect.StructField{
-		{Name: "First", Type: reflect.TypeFor[string](), Tag: `json:"value"`},
-		{Name: "Second", Type: reflect.TypeFor[string](), Tag: `json:"value"`},
-	})
-	if _, err := objectFieldNames(destinationType); err == nil {
-		t.Fatal("objectFieldNames() error = nil, want duplicate-tag rejection")
+func TestObjectFieldNamesRejectsInvalidSchemas(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		destinationType reflect.Type
+	}{
+		{"missing tag", reflect.TypeFor[struct{ Value string }]()},
+		{"case-conflicting tags", reflect.TypeFor[struct {
+			Lower string `json:"value"`
+			Upper string `json:"vALUE"`
+		}]()},
+		{"uppercase initial", reflect.TypeFor[struct {
+			Value string `json:"Value"`
+		}]()},
+		{"non-ASCII character", reflect.TypeFor[struct {
+			Value string `json:"valué"`
+		}]()},
+		{"embedded field", reflect.TypeFor[struct{ objectFixture }]()},
+		{"empty tag name", reflect.TypeFor[struct {
+			Value string `json:""`
+		}]()},
+		{"ignored field", reflect.TypeFor[struct {
+			Value string `json:"-"`
+		}]()},
+		{"tag option", reflect.TypeFor[struct {
+			Value string `json:"value,omitempty"`
+		}]()},
+		{"duplicate tag", reflect.StructOf([]reflect.StructField{
+			{Name: "First", Type: reflect.TypeFor[string](), Tag: `json:"value"`},
+			{Name: "Second", Type: reflect.TypeFor[string](), Tag: `json:"value"`},
+		})},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := objectFieldNames(tc.destinationType); err == nil {
+				t.Fatal("objectFieldNames() error = nil, want invalid-schema rejection")
+			}
+		})
 	}
 }
