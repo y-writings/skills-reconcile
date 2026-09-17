@@ -8,9 +8,17 @@ import (
 	"strings"
 )
 
+// ObjectSchema describes a product-owned JSON object and its canonical field names.
+type ObjectSchema interface {
+	CanonicalFieldNames() []string
+}
+
 // DecodeObject decodes one object into destination, rejects case aliases of
-// canonicalFields, and reports other fields in sorted order for caller policy.
-func DecodeObject(data []byte, destination any, canonicalFields ...string) ([]string, error) {
+// its canonical fields, and reports other fields in sorted order for caller policy.
+func DecodeObject[T ObjectSchema](data []byte, destination *T) ([]string, error) {
+	if destination == nil {
+		return nil, errors.New("JSON destination must not be nil")
+	}
 	if err := Validate(data); err != nil {
 		return nil, err
 	}
@@ -20,6 +28,7 @@ func DecodeObject(data []byte, destination any, canonicalFields ...string) ([]st
 		return nil, errors.New("JSON value must be an object")
 	}
 
+	canonicalFields := (*destination).CanonicalFieldNames()
 	canonical := make(map[string]struct{}, len(canonicalFields))
 	for _, field := range canonicalFields {
 		canonical[field] = struct{}{}
