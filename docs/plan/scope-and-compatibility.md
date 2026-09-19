@@ -66,7 +66,7 @@ grammar、flag、終了status、output schemaは[CLI契約](cli-contract.md)の�
 | -------------- | -------------------------------------------------------------------------- | --------------------------- |
 | CLI            | CLI契約で承認したcommand、全flag、終了status、stdout/stderr、output schema | black-box テスト            |
 | workspace 選択 | `--workspace`、環境変数、設定、カレントディレクトリの優先順                | table-driven test           |
-| manifest       | strict decode、schema、名前、opaqueなsource宣言、agent、決定的な出力       | fixture と unit test        |
+| manifest       | JSON完全性、schema、名前、opaqueなsource宣言、agent、決定的な出力          | fixture と unit test        |
 | 観測           | `skills --version` と `skills list -g --json`、installed treeを安全に読む  | fake CLI と fixture         |
 | ownership      | intent、宣言digest、公開CLI観測、tree fingerprintをreceiptへ結び付ける     | 状態表と失敗注入            |
 | plan           | install、reconfigure、unchanged、conflict、untrackedなどを区別する         | 状態表テスト                |
@@ -77,8 +77,13 @@ grammar、flag、終了status、output schemaは[CLI契約](cli-contract.md)の�
 | adopt          | remoteのsource宣言とkindを明示させ、上書き前に停止する                     | dry-run と失敗系テスト      |
 | v1 互換        | 明示されたv1入力だけをschema v2の通常経路から分離して扱う                  | 互換 fixture                |
 
-workspace configはtop-level objectとし、正確な`workspace`fieldだけを許可する。未知field、case alias、
-重複member、`null`、文字列以外の値を拒否する。空objectと空の`workspace`は未設定として扱う。
+読み取り対象のJSONは、UTF-8、単一値、全階層の重複memberがないことを共通検証する。JSON objectは
+`encoding/json`で型decodeし、各readerが必要とするstruct fieldだけを読み取る。未知fieldは読み飛ばし、
+field名の照合とJSON tagの解釈には`encoding/json`の標準動作を使う。大小文字に対する追加制約や独自の
+tag schema検証は設けない。fieldの必須性、null、domainのpolicyは各readerが検証する。
+
+workspace configはtop-level objectとし、`workspace`を文字列として読み取る。未知fieldは読み飛ばす。
+`workspace`がない場合と空文字列の場合は未設定として扱い、`null`と文字列以外の値は拒否する。
 
 remote source は外部CLIへ渡す宣言全体をそのまま保持し、完全一致と宣言digestだけを比較する。
 `skills-reconcile` は空値、制御文字、credential、remote kindでのlocal pathなど、自身のmanifestと
