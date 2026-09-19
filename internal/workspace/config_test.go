@@ -9,7 +9,9 @@ func TestDecodeWorkspaceConfig(t *testing.T) {
 	}{
 		{"missing workspace", " \n{}\t", "", false},
 		{"empty workspace", `{"workspace":""}`, "", false},
+		{"null workspace", `{"workspace":null}`, "", false},
 		{"configured workspace", `{"workspace":"/workspace"}`, "/workspace", true},
+		{"configured with unknown field", `{"workspace":"/workspace","future":true}`, "/workspace", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, found, err := decodeWorkspaceConfig([]byte(tc.data))
@@ -21,19 +23,8 @@ func TestDecodeWorkspaceConfig(t *testing.T) {
 }
 
 func TestDecodeWorkspaceConfigRejectsInvalidConfig(t *testing.T) {
-	for _, tc := range []struct{ name, data string }{
-		{"invalid UTF-8", "{\"workspace\":\"/work\xffspace\"}"},
-		{"null config", `null`},
-		{"null workspace", `{"workspace":null}`},
-		{"wrong workspace type", `{"workspace":42}`},
-		{"unknown field", `{"workpace":"/workspace"}`},
-		{"case variant", `{"workspace":"/workspace","Workspace":"/other"}`},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			workspaceDir, found, err := decodeWorkspaceConfig([]byte(tc.data))
-			if err != errInvalidConfig || workspaceDir != "" || found {
-				t.Fatalf("decodeWorkspaceConfig() = (%q, %t, %v), want (\"\", false, %v)", workspaceDir, found, err, errInvalidConfig)
-			}
-		})
+	workspaceDir, found, err := decodeWorkspaceConfig([]byte(`{"workspace":42}`))
+	if err != errInvalidConfig || workspaceDir != "" || found {
+		t.Fatalf("decodeWorkspaceConfig() = (%q, %t, %v), want (\"\", false, %v)", workspaceDir, found, err, errInvalidConfig)
 	}
 }

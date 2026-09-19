@@ -46,21 +46,23 @@ Goの直接build、Nix package、開発コンテナを同じCLI契約に対し�
 
 ## フェーズ 2: 読み取りコア
 
-| ID  | PR の責務                                    | 主な成果物                                                 |     目安 | 完了条件                                                     |
-| --- | -------------------------------------------- | ---------------------------------------------------------- | -------: | ------------------------------------------------------------ |
-| C01 | workspace と manifest の場所を解決する       | 優先順位、絶対パス検証、設定 fixture                       |  250–450 | flag、環境変数、設定、cwd の各経路を副作用なしで検証できる   |
-| J01 | JSON 文書の完全性を共通化する                | UTF-8、単一値、全階層の重複 member 拒否                    |   50–100 | workspace と後続 reader が同じ事前検証を利用できる           |
-| J02 | canonical object decodeを共通化する          | object必須、known fieldのcase alias拒否                    |    50–90 | unknown field policyをcallerに残して型decodeできる           |
-| C02 | workspace設定をforward compatibleにする      | canonicalな`workspace`、unknown field許容                  |    20–50 | 将来fieldと既存workspace設定を同時に読み取れる               |
-| C03 | 公開された `skills` CLI を観測する           | version確認、global list decode、agent正規化、fake process |  300–450 | private lockを読まず、CLI失敗と曖昧な一覧を区別できる        |
-| C04 | manifest のモデルと strict decode を実装する | schema 型、未知 field・trailing JSON の拒否                |  250–400 | 合成 manifest を読み取れ、ファイル更新はまだ行わない         |
-| C05 | schema、default、名前を検証する              | version、agent、install name の規則                        |  250–430 | schema と名前衝突を実行前に拒否できる                        |
-| C06 | remote宣言の自前policyを検証する             | 空値、制御文字、credential、local path拒否                 |  180–300 | provider構文を解釈せず、manifest固有の危険だけ拒否できる     |
-| K01 | `doctor` のCLI契約を承認する                 | grammar、flag、終了status、text/JSON schema                | 文書のみ | C07が参照する完全なinterfaceがCLI契約へ登録される            |
-| C07 | remote 範囲の `doctor` を公開する            | 入力・公開CLI観測の診断、CLI テスト                        |  250–450 | container fixture に対して読み取り専用で成功・失敗を説明する |
+| ID  | PR の責務                              | 主な成果物                                                 |     目安 | 完了条件                                                     |
+| --- | -------------------------------------- | ---------------------------------------------------------- | -------: | ------------------------------------------------------------ |
+| C01 | workspace と manifest の場所を解決する | 優先順位、絶対パス検証、設定 fixture                       |  250–450 | flag、環境変数、設定、cwd の各経路を副作用なしで検証できる   |
+| J01 | JSON 文書の完全性を共通化する          | UTF-8、単一値、全階層の重複 member 拒否                    |   50–100 | workspace と後続 reader が同じ事前検証を利用できる           |
+| J02 | JSON objectの型decodeを共通化する      | object必須、`encoding/json`によるstruct decode             |    20–50 | 必要なfieldだけを型decodeし、未知fieldを読み飛ばせる         |
+| C03 | 公開された `skills` CLI を観測する     | version確認、global list decode、agent正規化、fake process |  300–450 | private lockを読まず、CLI失敗と曖昧な一覧を区別できる        |
+| C04 | manifest のモデルと型decodeを実装する  | schema 型、必要fieldの型decode                             |  250–400 | 合成 manifest を読み取れ、ファイル更新はまだ行わない         |
+| C05 | schema、default、名前を検証する        | version、agent、install name の規則                        |  250–430 | schema と名前衝突を実行前に拒否できる                        |
+| C06 | remote宣言の自前policyを検証する       | 空値、制御文字、credential、local path拒否                 |  180–300 | provider構文を解釈せず、manifest固有の危険だけ拒否できる     |
+| K01 | `doctor` のCLI契約を承認する           | grammar、flag、終了status、text/JSON schema                | 文書のみ | C07が参照する完全なinterfaceがCLI契約へ登録される            |
+| C07 | remote 範囲の `doctor` を公開する      | 入力・公開CLI観測の診断、CLI テスト                        |  250–450 | container fixture に対して読み取り専用で成功・失敗を説明する |
 
-J01はUTF-8、単一のJSON値、全階層の重複member拒否だけを共有する。J02はobject必須とknown fieldの
-canonical spellingを共有し、unknown field、型、null、domainのpolicyは各readerに残す。C03が依存するのは
+J01はUTF-8、単一のJSON値、全階層の重複member拒否だけを共有する。J02はroot objectを必須とし、J01の
+完全性検証後に`encoding/json`でdestinationへdecodeする。各readerがdestination structに定義した必要な
+fieldだけを読み取り、未知fieldは読み飛ばす。field名の照合とJSON tagの解釈は`encoding/json`の標準動作に
+従い、大小文字に対する追加制約や独自のtag schema検証は加えない。fieldの必須性、null、domainのpolicyは
+各readerに残す。C03が依存するのは
 固定した `skills` の公開commandとmachine-readable outputだけとし、private module、private source parser、
 global lockのpathまたはschemaを実装しない。C06はsourceをopaqueな実行宣言として保持し、外部CLIが
 受理するprovider構文や異なる表記の意味的同一性を判定しない。
@@ -109,24 +111,24 @@ digestで比較し、aliasやprovider URLのsemantic identityを導入しない�
 
 ## フェーズ 6: workspace Skill
 
-| ID  | PR の責務                                  | 主な成果物                                          |     目安 | 完了条件                                                              |
-| --- | ------------------------------------------ | --------------------------------------------------- | -------: | --------------------------------------------------------------------- |
-| W01 | Skill ツリーを安全に列挙する               | path、file type、symlink、digest、mode              |  300–450 | 一時ツリーだけを読み、installer 除外対象を同じ規則で扱う              |
-| W02 | frontmatter の境界と name を検証する       | header、終端、name scalar                           |  250–420 | CRLF、未終端、非文字列 name の境界を fixture で固定する               |
-| W03 | description と追加 field を検証する        | quoted/block scalar、top-level 制約                 |  300–450 | description の形式と unsupported nested 値を明示的に拒否する          |
-| W04 | workspace path と copy を安全に扱う        | root containment、staging copy、mode                |  280–450 | root 外、symlink parent、特殊ファイルを copy しない                   |
-| W05 | workspace manifest entry を有効にする      | `kind=workspace`、固定相対 path、directory 検査     |  250–430 | Skill 本体を移行先へ追加せず、合成 workspace を検証できる             |
-| W06 | projection を読み書きする                  | XDG state path、strict decode、private atomic write |  300–450 | 実 HOME を使わず、missing・競合・壊れた state を検証できる            |
-| W07 | インストールされた全 copy を検証する       | agent path 解決、symlink target、digest 比較        |  350–480 | canonical copy だけを信頼せず、観測可能な copy の一致を確認する       |
-| W08 | workspace の基本 plan を追加する           | install、unchanged、content update                  |  300–450 | desired tree と install tree の状態表テストが通る                     |
-| W09 | workspace の所有権 plan を追加する         | ownership conflict、unregistered、遷移              |  300–450 | manifest、receipt、projectionの曖昧な組み合わせを変更対象にしない     |
-| W10 | workspace install を追加する               | source 再検証、外部 CLI 引数、失敗集約              |  280–450 | plan 後に source が変わった場合、process 実行前に停止する             |
-| W11 | install 前の projection intent を記録する  | crash recovery、状態更新、失敗注入                  |  300–450 | 外部 process より前に再実行可能な所有権 intent が残る                 |
-| W12 | remote/workspace 遷移を検証する            | 再観測、receipt確定、projection 除去                |  300–450 | remote の新しい所有権を確認する前に workspace 記録を捨てない          |
-| W13 | workspace 削除後の状態を検証する           | prune 後の再観測、state cleanup                     |  300–450 | install が残る場合や対象が変わった場合は ownership を保持する         |
-| K05 | workspace向けCLI拡張契約を承認する         | 既存commandの入力、status、text/JSON schema拡張     | 文書のみ | W14とW15が参照するinterface拡張がCLI契約へ登録される                  |
-| W14 | `doctor` と `plan` を workspace 対応にする | 警告、未登録 directory、JSON 出力                   |  220–400 | schema v2 の remote/workspace 混在 fixture を読み取り専用で診断できる |
-| W15 | workspace 対応 `apply` を公開する          | process-wide apply lock、phase結合、CLI test        |  280–450 | 途中失敗から再実行でき、同じ workspace の再実行が収束する             |
+| ID  | PR の責務                                  | 主な成果物                                                |     目安 | 完了条件                                                              |
+| --- | ------------------------------------------ | --------------------------------------------------------- | -------: | --------------------------------------------------------------------- |
+| W01 | Skill ツリーを安全に列挙する               | path、file type、symlink、digest、mode                    |  300–450 | 一時ツリーだけを読み、installer 除外対象を同じ規則で扱う              |
+| W02 | frontmatter の境界と name を検証する       | header、終端、name scalar                                 |  250–420 | CRLF、未終端、非文字列 name の境界を fixture で固定する               |
+| W03 | description と追加 field を検証する        | quoted/block scalar、top-level 制約                       |  300–450 | description の形式と unsupported nested 値を明示的に拒否する          |
+| W04 | workspace path と copy を安全に扱う        | root containment、staging copy、mode                      |  280–450 | root 外、symlink parent、特殊ファイルを copy しない                   |
+| W05 | workspace manifest entry を有効にする      | `kind=workspace`、固定相対 path、directory 検査           |  250–430 | Skill 本体を移行先へ追加せず、合成 workspace を検証できる             |
+| W06 | projection を読み書きする                  | XDG state path、必要fieldの型decode、private atomic write |  300–450 | 実 HOME を使わず、missing・競合・壊れた state を検証できる            |
+| W07 | インストールされた全 copy を検証する       | agent path 解決、symlink target、digest 比較              |  350–480 | canonical copy だけを信頼せず、観測可能な copy の一致を確認する       |
+| W08 | workspace の基本 plan を追加する           | install、unchanged、content update                        |  300–450 | desired tree と install tree の状態表テストが通る                     |
+| W09 | workspace の所有権 plan を追加する         | ownership conflict、unregistered、遷移                    |  300–450 | manifest、receipt、projectionの曖昧な組み合わせを変更対象にしない     |
+| W10 | workspace install を追加する               | source 再検証、外部 CLI 引数、失敗集約                    |  280–450 | plan 後に source が変わった場合、process 実行前に停止する             |
+| W11 | install 前の projection intent を記録する  | crash recovery、状態更新、失敗注入                        |  300–450 | 外部 process より前に再実行可能な所有権 intent が残る                 |
+| W12 | remote/workspace 遷移を検証する            | 再観測、receipt確定、projection 除去                      |  300–450 | remote の新しい所有権を確認する前に workspace 記録を捨てない          |
+| W13 | workspace 削除後の状態を検証する           | prune 後の再観測、state cleanup                           |  300–450 | install が残る場合や対象が変わった場合は ownership を保持する         |
+| K05 | workspace向けCLI拡張契約を承認する         | 既存commandの入力、status、text/JSON schema拡張           | 文書のみ | W14とW15が参照するinterface拡張がCLI契約へ登録される                  |
+| W14 | `doctor` と `plan` を workspace 対応にする | 警告、未登録 directory、JSON 出力                         |  220–400 | schema v2 の remote/workspace 混在 fixture を読み取り専用で診断できる |
+| W15 | workspace 対応 `apply` を公開する          | process-wide apply lock、phase結合、CLI test              |  280–450 | 途中失敗から再実行でき、同じ workspace の再実行が収束する             |
 
 W01からW04は、Skill treeの独立した安全契約を一つずつ固定するため別PRとする。W15が終わるまでは、
 workspace entryを含む `apply` を明示的に拒否する。remoteとworkspaceという二つのkindがそろうW15で、
@@ -169,7 +171,7 @@ F03まで `.worktrees/skills` は変更・削除しない。rollback参照を除
 - [ ] 承認済みの製品契約と、利用した外部CLIの公開境界をPR本文へ記載した。
 - [ ] 利用者向けcommandを変更するPRは、先に承認されたCLI契約entryを参照している。
 - [ ] private module、private source parser、private global lockに依存していない。
-- [ ] 未対応の入力を無視せず、明示的に拒否する。
+- [ ] 未対応のCLI command、positional argument、flagを無視せず、明示的に拒否する。
 - [ ] 手書きによる非テスト実装の追加行＋削除行が 500 行以下である。
 - [ ] 実装と対応テストを同じ PR に含め、実装、テスト、fixture、生成物、文書を別集計した。
 - [ ] 手書き総差分が 1,000 行を超える場合、分割要否をレビューした。

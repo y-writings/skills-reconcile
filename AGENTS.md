@@ -27,8 +27,8 @@
   managed Skills. Repository-local Skills under `.agents/skills/**` may be committed when they only
   provide development or migration guidance for `skills-reconcile` and contain none of that
   prohibited source or user data.
-- Implement one approved, reviewable behavior and its tests at a time. Unsupported inputs and flags must fail
-  explicitly instead of being ignored.
+- Implement one approved, reviewable behavior and its tests at a time. Unsupported CLI commands,
+  positional arguments, and flags must fail explicitly instead of being ignored.
 - Do not mix bug fixes, specification changes, general refactoring, or unrelated dependency updates
   into a migration change without explicit direction. When an approved contract and the public
   dependency boundary disagree, report the evidence before implementing that behavior.

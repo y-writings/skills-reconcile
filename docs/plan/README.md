@@ -80,7 +80,7 @@ inventory の参照revisionは自動では動かさない。参照revisionの変
 
 1. 合意した一つの振る舞いを移行先の責務境界に合わせて実装し、その振る舞いを固定するテストを
    同じ PR に置く。inventory のファイルを実装単位としてコピーしない。
-2. まだ移していない入力やフラグは、無視せず「未対応」として失敗させる。
+2. まだ移していないCLI command、positional argument、flagは、無視せず「未対応」として失敗させる。
 3. 読み取り、追加・更新、削除の順序を守る。特に削除は `--prune` と明示確認を維持する。
 4. 実環境の `$HOME`、`XDG_CONFIG_HOME`、`XDG_STATE_HOME` をテストや開発コンテナへ渡さない。
 5. regular PRは`main`へmergeされた直前項目だけに依存させる。明示的なstackでは同じstack内の直前

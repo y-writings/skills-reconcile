@@ -135,8 +135,8 @@ stop before implementation. Do not create a branch or change files, commits, or 
   destination CLI/module names and the dependency order in the plan.
 - For a user-facing command, implement only grammar, flags, status semantics, output, and side effects
   already approved in `docs/plan/cli-contract.md`. A roadmap item name is not an interface contract.
-- Add synthetic fixtures and failure-path tests with the behavior. Keep unsupported inputs and flags
-  explicit rather than silently accepting them.
+- Add synthetic fixtures and failure-path tests with the behavior. Keep unsupported CLI commands,
+  positional arguments, and flags explicit rather than silently accepting them.
 - Make the smallest reader-oriented change that satisfies the established contract. Do not add
   speculative abstractions or compatibility aliases.
 - Keep the migration inventory read-only and the destination buildable at every review boundary.
