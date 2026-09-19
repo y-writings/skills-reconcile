@@ -24,17 +24,41 @@ type invalidTagFixture struct {
 
 type scalarFixture string
 
-func (objectFixture) StrictJSONObjectSchema() {}
+type nestedObjectFixture struct {
+	Child   nestedFieldFixture            `json:"child"`
+	Pointer *nestedFieldFixture           `json:"pointer"`
+	Items   []nestedFieldFixture          `json:"items"`
+	ByName  map[string]nestedFieldFixture `json:"byName"`
+}
 
-func (rawObjectFixture) StrictJSONObjectSchema() {}
+type nestedFieldFixture struct {
+	Known string `json:"known"`
+}
 
-func (customObjectFixture) StrictJSONObjectSchema() {}
+type rawNestedObjectFixture struct {
+	Value json.RawMessage `json:"value"`
+}
 
-func (invalidTagFixture) StrictJSONObjectSchema() {}
+type customNestedObjectFixture struct {
+	Value customFieldFixture `json:"value"`
+}
 
-func (scalarFixture) StrictJSONObjectSchema() {}
+type customFieldFixture struct {
+	Decoded string
+}
+
+type invalidNestedObjectFixture struct {
+	Child struct {
+		MissingTag string
+	} `json:"child"`
+}
 
 func (*customObjectFixture) UnmarshalJSON([]byte) error {
+	return nil
+}
+
+func (field *customFieldFixture) UnmarshalJSON(data []byte) error {
+	field.Decoded = string(data)
 	return nil
 }
 
@@ -95,6 +119,74 @@ func TestDecodeObjectRejectsFieldsOutsideCanonicalSet(t *testing.T) {
 	}
 }
 
+func TestDecodeObjectValidatesNestedObjectSchemas(t *testing.T) {
+	var got nestedObjectFixture
+	data := []byte(`{"child":{"known":"child"},"pointer":{"known":"pointer"},"items":[{"known":"item"}],"byName":{"arbitrary":{"known":"map value"}}}`)
+	if err := DecodeObject(data, &got); err != nil {
+		t.Fatalf("DecodeObject() error = %v, want nil", err)
+	}
+	if got.Child.Known != "child" {
+		t.Fatalf("child = %q, want %q", got.Child.Known, "child")
+	}
+	if got.Pointer == nil || got.Pointer.Known != "pointer" {
+		t.Fatalf("pointer = %#v, want known pointer", got.Pointer)
+	}
+	if len(got.Items) != 1 || got.Items[0].Known != "item" {
+		t.Fatalf("items = %#v, want one known item", got.Items)
+	}
+	if got.ByName["arbitrary"].Known != "map value" {
+		t.Fatalf("byName = %#v, want arbitrary key with known value", got.ByName)
+	}
+}
+
+func TestDecodeObjectRejectsUnknownFieldsInNestedObjectSchemas(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		data string
+	}{
+		{"direct struct", `{"child":{"future":true}}`},
+		{"pointer to struct", `{"pointer":{"future":true}}`},
+		{"slice element", `{"items":[{"future":true}]}`},
+		{"map value", `{"byName":{"arbitrary":{"future":true}}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got nestedObjectFixture
+			if err := DecodeObject([]byte(tc.data), &got); err == nil {
+				t.Fatal("DecodeObject() error = nil, want nested unknown-field rejection")
+			}
+		})
+	}
+}
+
+func TestDecodeObjectLeavesNestedNullPolicyToCaller(t *testing.T) {
+	var got nestedObjectFixture
+	if err := DecodeObject([]byte(`{"pointer":null}`), &got); err != nil || got.Pointer != nil {
+		t.Fatalf("DecodeObject() = (%#v, %v), want (pointer: nil, nil)", got, err)
+	}
+}
+
+func TestDecodeObjectLeavesRawAndCustomValuesToTheirDecoders(t *testing.T) {
+	t.Run("raw message", func(t *testing.T) {
+		var got rawNestedObjectFixture
+		if err := DecodeObject([]byte(`{"value":{"future":true}}`), &got); err != nil {
+			t.Fatalf("DecodeObject() error = %v, want nil", err)
+		}
+		if string(got.Value) != `{"future":true}` {
+			t.Fatalf("raw value = %s, want preserved object", got.Value)
+		}
+	})
+
+	t.Run("custom unmarshaler", func(t *testing.T) {
+		var got customNestedObjectFixture
+		if err := DecodeObject([]byte(`{"value":{"future":true}}`), &got); err != nil {
+			t.Fatalf("DecodeObject() error = %v, want nil", err)
+		}
+		if got.Value.Decoded != `{"future":true}` {
+			t.Fatalf("custom value = %s, want decoded object", got.Value.Decoded)
+		}
+	})
+}
+
 func TestDecodeObjectUsesDocumentIntegrityValidation(t *testing.T) {
 	var got rawObjectFixture
 	if err := DecodeObject([]byte(`{"value":{"x":1,"x":2}}`), &got); err == nil {
@@ -128,6 +220,10 @@ func TestDecodeObjectRejectsInvalidDestinations(t *testing.T) {
 		}},
 		{"custom unmarshal", func() error {
 			var destination customObjectFixture
+			return DecodeObject([]byte(`{}`), &destination)
+		}},
+		{"invalid nested schema", func() error {
+			var destination invalidNestedObjectFixture
 			return DecodeObject([]byte(`{}`), &destination)
 		}},
 	} {

@@ -58,9 +58,10 @@ Goの直接build、Nix package、開発コンテナを同じCLI契約に対し�
 | K01 | `doctor` のCLI契約を承認する                 | grammar、flag、終了status、text/JSON schema                | 文書のみ | C07が参照する完全なinterfaceがCLI契約へ登録される            |
 | C07 | remote 範囲の `doctor` を公開する            | 入力・公開CLI観測の診断、CLI テスト                        |  250–450 | container fixture に対して読み取り専用で成功・失敗を説明する |
 
-J01はUTF-8、単一のJSON値、全階層の重複member拒否だけを共有する。J02はdestinationをstrict object schemaとして明示したnamed
-structに限定する。object必須と、小文字ASCIIで始まる英数字のJSON tagに完全一致しないtop-level fieldの拒否を共有し、
-fieldの必須性、型、null、domainのpolicyは各readerに残す。C03が依存するのは
+J01はUTF-8、単一のJSON値、全階層の重複member拒否だけを共有する。J02はdestinationの明示JSON tagをobject schemaとして
+使い、root objectと、pointer、array/slice要素、map valueを通じて到達する通常のstruct objectで、小文字ASCIIで始まる英数字の
+tagに完全一致しないfieldを拒否する。`json.RawMessage`、interface、独自のJSON unmarshalを持つfieldは各readerまたはそのdecoderに
+委ね、fieldの必須性、型、null、domainのpolicyは各readerに残す。C03が依存するのは
 固定した `skills` の公開commandとmachine-readable outputだけとし、private module、private source parser、
 global lockのpathまたはschemaを実装しない。C06はsourceをopaqueな実行宣言として保持し、外部CLIが
 受理するprovider構文や異なる表記の意味的同一性を判定しない。
