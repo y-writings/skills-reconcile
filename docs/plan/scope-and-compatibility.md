@@ -82,8 +82,8 @@ grammar、flag、終了status、output schemaは[CLI契約](cli-contract.md)の�
 field名の照合とJSON tagの解釈には`encoding/json`の標準動作を使う。大小文字に対する追加制約や独自の
 tag schema検証は設けない。fieldの必須性、null、domainのpolicyは各readerが検証する。
 
-workspace configはtop-level objectとし、`workspace`を文字列として読み取る。未知fieldは読み飛ばす。
-`workspace`がない場合と空文字列の場合は未設定として扱い、`null`と文字列以外の値は拒否する。
+workspace configはtop-level objectとし、未知fieldは読み飛ばす。`workspace`が文字列ならその値を読み取る。
+`workspace`がない場合、空文字列、`null`は未設定として扱い、それ以外の値は拒否する。
 
 remote source は外部CLIへ渡す宣言全体をそのまま保持し、完全一致と宣言digestだけを比較する。
 `skills-reconcile` は空値、制御文字、credential、remote kindでのlocal pathなど、自身のmanifestと

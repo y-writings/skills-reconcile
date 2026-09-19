@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -34,22 +33,12 @@ func lookupWorkspaceDirFromConfig() (workspaceDir string, found bool, err error)
 	return decodeWorkspaceConfig(data)
 }
 
-func decodeWorkspaceConfig(data []byte) (workspaceDir string, found bool, err error) {
+func decodeWorkspaceConfig(data []byte) (string, bool, error) {
 	var config struct {
-		Workspace json.RawMessage `json:"workspace"`
+		Workspace string `json:"workspace"`
 	}
 	if jsondoc.DecodeObject(data, &config) != nil {
 		return "", false, errInvalidConfig
 	}
-	if config.Workspace == nil {
-		return "", false, nil
-	}
-	var workspace *string
-	if json.Unmarshal(config.Workspace, &workspace) != nil || workspace == nil {
-		return "", false, errInvalidConfig
-	}
-	if *workspace == "" {
-		return "", false, nil
-	}
-	return *workspace, true, nil
+	return config.Workspace, config.Workspace != "", nil
 }
