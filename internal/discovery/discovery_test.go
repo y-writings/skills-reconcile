@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestSkillsRecognizesDirectSkillDirectories(t *testing.T) {
+func TestSkillNamesRecognizesDirectSkillDirectories(t *testing.T) {
 	root := newScanRoot(t)
 	writeSkill(t, root, "middle", "---\nname: middle\n---\n")
 	writeSkill(t, root, "Zed", "")
@@ -30,17 +30,17 @@ func TestSkillsRecognizesDirectSkillDirectories(t *testing.T) {
 	mustMkdirAll(t, symlinkSkill, 0o700)
 	mustSymlink(t, symlinkTarget, filepath.Join(symlinkSkill, "SKILL.md"))
 
-	got, err := Skills(root)
+	got, err := SkillNames(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"Zed", "alpha", "middle"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Skills() = %q, want %q", got, want)
+		t.Fatalf("SkillNames() = %q, want %q", got, want)
 	}
 }
 
-func TestSkillsReturnsEmptyWhenNoSkillsMatch(t *testing.T) {
+func TestSkillNamesReturnsEmptyWhenNoSkillsMatch(t *testing.T) {
 	tests := map[string]func(*testing.T, string){
 		"empty root": func(_ *testing.T, _ string) {},
 		"ignored entries": func(t *testing.T, root string) {
@@ -54,18 +54,18 @@ func TestSkillsReturnsEmptyWhenNoSkillsMatch(t *testing.T) {
 			root := newScanRoot(t)
 			populate(t, root)
 
-			got, err := Skills(root)
+			got, err := SkillNames(root)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if len(got) != 0 {
-				t.Fatalf("Skills() = %q, want empty", got)
+				t.Fatalf("SkillNames() = %q, want empty", got)
 			}
 		})
 	}
 }
 
-func TestSkillsUsesRootEntryNameForDirectorySymlink(t *testing.T) {
+func TestSkillNamesUsesRootEntryNameForDirectorySymlink(t *testing.T) {
 	root := newScanRoot(t)
 	targetParent := t.TempDir()
 	writeSkill(t, targetParent, "target-name", "outside the scan root")
@@ -75,17 +75,17 @@ func TestSkillsUsesRootEntryNameForDirectorySymlink(t *testing.T) {
 	mustWriteFile(t, fileTarget, nil, 0o600)
 	mustSymlink(t, fileTarget, filepath.Join(root, "file-link"))
 
-	got, err := Skills(root)
+	got, err := SkillNames(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"linked-name"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Skills() = %q, want %q", got, want)
+		t.Fatalf("SkillNames() = %q, want %q", got, want)
 	}
 }
 
-func TestSkillsFollowsSymlinkedScanRoot(t *testing.T) {
+func TestSkillNamesFollowsSymlinkedScanRoot(t *testing.T) {
 	temp := t.TempDir()
 	realRoot := filepath.Join(temp, "real-root")
 	mustMkdirAll(t, realRoot, 0o700)
@@ -94,17 +94,17 @@ func TestSkillsFollowsSymlinkedScanRoot(t *testing.T) {
 	linkedRoot := filepath.Join(temp, "linked-root")
 	mustSymlink(t, realRoot, linkedRoot)
 
-	got, err := Skills(linkedRoot)
+	got, err := SkillNames(linkedRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"example"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Skills() = %q, want %q", got, want)
+		t.Fatalf("SkillNames() = %q, want %q", got, want)
 	}
 }
 
-func TestSkillsRejectsInvalidScanRoot(t *testing.T) {
+func TestSkillNamesRejectsInvalidScanRoot(t *testing.T) {
 	t.Run("missing", func(t *testing.T) {
 		root := filepath.Join(t.TempDir(), "missing")
 		assertDiscoveryFailure(t, root)
@@ -134,7 +134,7 @@ func TestSkillsRejectsInvalidScanRoot(t *testing.T) {
 	})
 }
 
-func TestSkillsFailsWithoutPartialResultsForInvalidSymlink(t *testing.T) {
+func TestSkillNamesFailsWithoutPartialResultsForInvalidSymlink(t *testing.T) {
 	tests := map[string]func(*testing.T, string){
 		"broken": func(t *testing.T, path string) {
 			mustSymlink(t, filepath.Join(t.TempDir(), "missing"), path)
@@ -155,7 +155,7 @@ func TestSkillsFailsWithoutPartialResultsForInvalidSymlink(t *testing.T) {
 	}
 }
 
-func TestSkillsFailsWithoutPartialResultsForUnreadableEntry(t *testing.T) {
+func TestSkillNamesFailsWithoutPartialResultsForUnreadableEntry(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("permission checks are ineffective as root")
 	}
@@ -176,7 +176,7 @@ func TestSkillsFailsWithoutPartialResultsForUnreadableEntry(t *testing.T) {
 	assertDiscoveryFailure(t, root)
 }
 
-func TestSkillsDoesNotModifyInputTree(t *testing.T) {
+func TestSkillNamesDoesNotModifyInputTree(t *testing.T) {
 	temp := t.TempDir()
 	root := filepath.Join(temp, "root")
 	mustMkdirAll(t, root, 0o700)
@@ -185,7 +185,7 @@ func TestSkillsDoesNotModifyInputTree(t *testing.T) {
 	mustSymlink(t, filepath.Join(temp, "outside"), filepath.Join(root, "linked"))
 
 	before := snapshotTree(t, temp)
-	if _, err := Skills(root); err != nil {
+	if _, err := SkillNames(root); err != nil {
 		t.Fatal(err)
 	}
 	after := snapshotTree(t, temp)
@@ -210,12 +210,12 @@ func writeSkill(t *testing.T, parent, name, contents string) {
 
 func assertDiscoveryFailure(t *testing.T, root string) {
 	t.Helper()
-	got, err := Skills(root)
+	got, err := SkillNames(root)
 	if err == nil {
-		t.Fatal("Skills() error = nil, want failure")
+		t.Fatal("SkillNames() error = nil, want failure")
 	}
 	if got != nil {
-		t.Fatalf("Skills() = %q on failure, want nil", got)
+		t.Fatalf("SkillNames() = %q on failure, want nil", got)
 	}
 }
 
