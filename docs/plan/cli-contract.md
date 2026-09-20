@@ -13,35 +13,83 @@
 `migrate`、`capture` の契約と追加順序はすべて破棄する。
 
 現在のソースコードに存在する最小 `--help` 挙動は、旧計画の途中状態であり、新製品の将来契約を
-決める根拠にはしない。新しい一覧 command の契約が承認されるまでは、新しい利用者向け interface を
-追加しない。
+決める根拠にはしない。新しい利用者向け interface は、以下で承認した一覧 command に限定する。
 
-## 次に決める契約
+## 承認済みの契約
 
 ### N01: `$HOME/.agents/skills` の一覧表示
 
-#### 決定済み
+#### Command の選択
 
 - 一覧 command の名前は `list` とする。
 - argument vector の先頭が `list` の場合に一覧処理を選択する。
 - `list` より後ろの argument は、最初の実装では解釈も検証もしない。
-- 一覧処理はファイルを一切変更しない。
+- argument がない場合と、先頭の argument が `list` または単独の `--help` ではない場合は失敗する。
+- `--help` は単独で指定された場合だけ成功する。`list --help` は一覧処理を選択し、`--help` を解釈しない。
 
-#### 未決事項
+#### Scan root の解決
 
-実装前に、次のうち実装へ必要な挙動を順次決める。
+- process 起動時の `HOME` 環境変数を利用者の home directory とする。
+- `HOME` は空でない絶対 path でなければならない。未設定、空、相対 path の場合は失敗する。
+- scan root は `HOME` に `.agents/skills` を連結した path とする。
+- 設定ファイル、XDG directory、現在の working directory、外部 CLI から scan root を補完しない。
+- `HOME` または scan root 自体が symlink を含む場合は、OS の通常の path 解決に従う。
+- scan root が存在しない、directory ではない、読み取れない場合は失敗する。
 
-- `$HOME/.agents/skills` の解決方法
-- 一覧上で一つの Skill と認識する条件
-- 通常ディレクトリ、symlink、壊れた symlink、`SKILL.md` がない entry の扱い
-- 読み取り不能、対象ディレクトリなし、一覧が空の場合の扱い
-- 表示する field と決定的な並び順
-- stdout と stderr の使い分け
-- 成功と失敗の終了 status
-- text output の安定性と、machine-readable output を最初から提供するかどうか
+#### Skill の認識
 
-ロードマップは上記の論点を列挙するだけで、答えを暗黙に決めない。N01 の契約が承認された後にだけ、
-対応する CLI 実装へ進む。
+- scan root の直下だけを走査し、再帰的に探索しない。
+- root 直下の entry が directory であり、その直下に symlink ではない通常ファイルの `SKILL.md` が
+  存在する場合、その entry を一つの Skill と認識する。
+- `SKILL.md` の内容、frontmatter、名前、空かどうかは検証しない。空の `SKILL.md` も認識条件を満たす。
+- 通常ファイル、特殊ファイル、directory 以外を指す symlink は Skill として扱わない。
+- `SKILL.md` が存在しない directory、または `SKILL.md` が通常ファイルではない directory は Skill として
+  扱わない。
+
+#### Symlink と異常 entry
+
+- root 直下の symlink が directory を指し、その directory が Skill の認識条件を満たす場合は Skill として
+  扱う。一覧には symlink target の名前ではなく、root 直下の entry 名を使用する。
+- root 直下の symlink target が scan root 外にあっても、一覧のための読み取りに限って認識対象にする。
+  この決定は、将来のコピー処理で scan root 外の target を許可する根拠にしない。
+- root 直下の壊れた symlink、symlink loop、entry の種類または `SKILL.md` の状態を確認できない読み取り
+  error が一つでもある場合は、一覧処理全体を失敗させる。
+- discovery が失敗した場合は、確認済みの Skill を部分結果として stdout に出力しない。
+
+#### 成功時の出力
+
+- 表示 field は root 直下の entry 名だけとし、絶対 path と symlink target は表示しない。
+- entry 名を byte 列として昇順に並べ、それぞれを変更せず一行ずつ stdout に出力する。
+- scan root が存在して読み取り可能だが、認識条件を満たす Skill がない場合は成功し、stdout には何も
+  出力しない。scan root が空の場合と、認識対象外の entry だけがある場合を同じ結果として扱う。
+- 成功時の終了 status は `0` とし、stderr には何も出力しない。
+- 上記の text output を最初の安定 interface とする。machine-readable output と出力形式を切り替える
+  option は提供しない。
+
+#### 失敗時の出力
+
+- 利用者が対処できる診断を stderr に出力し、終了 status は `1` とする。
+- discovery の失敗では stdout に何も出力しない。
+- 診断文の具体的な wording は安定 interface としない。
+
+#### Help
+
+単独の `--help` は、次の text を stdout に出力して成功する。
+
+```text
+Usage:
+  skills-reconcile list
+  skills-reconcile --help
+
+Commands:
+  list    List Skills in $HOME/.agents/skills.
+```
+
+#### 副作用
+
+- 一覧処理は Skill、設定、lock、state、Git repository を作成、変更、移動、削除しない。
+- symlink target が scan root 外にある場合も、root 内外を問わずファイルへ書き込まない。
+- 外部 CLI や network を使用しない。
 
 ## 後で決める契約
 
