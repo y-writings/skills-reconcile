@@ -1,42 +1,47 @@
 ---
 name: skills-reconcile-roadmap-pr
-description: Advance exactly one skills-reconcile roadmap item from preflight through a verified pull request. Use only when explicitly invoked in this repository; stop for unresolved scope, specification, safety, or verification decisions.
+description: Advance exactly one currently approved skills-reconcile roadmap item through investigation, implementation, verification, and a pull request. Use only when explicitly invoked in this repository. Re-read the current repository instructions and plan on every invocation; never treat this skill as product authority or reuse obsolete roadmap assumptions.
 ---
 
 <!-- markdownlint-disable MD013 -->
 
 # Skills Reconcile Roadmap PR
 
-## Outcome
+## Role
 
-Start work on exactly one item in `docs/plan/pr-roadmap.md`. For a regular pull request or the root of
-an explicitly requested stack, start from the latest successful `main`; for a later stack layer, start
-from the preceding item's branch in that same stack.
-On the green path, establish the destination contract, implement and verify the item, commit and
-push the branch, and create a pull request with the approved branch workflow. Never merge the pull request.
+Use this skill as a workflow for completing one current roadmap item. It controls how to inspect,
+implement, verify, and publish a change; it does not define what `skills-reconcile` should do.
 
-## Interpret the invocation
+The repository's current `AGENTS.md` and `docs/plan/**` are the only product and process authority.
+Read them again on every invocation. Do not carry command names, roadmap IDs, domain models, safety
+rules, dependencies, or discarded assumptions from an earlier session or from this skill.
 
-- Run this workflow only after explicit invocation. `agents/openai.yaml` disables implicit use.
-- Treat an item ID named by the user as the target. Otherwise determine the single next item from
-  roadmap order, repository state, and merged pull requests, including open preceding layers when the
-  user explicitly requested a stack.
-- Choose the requested endpoint before entering the roadmap workflow:
-  - a named verification runs only that check on the current checkout;
-  - investigation stops after establishing and reporting the working contract;
-  - a verified local change stops after implementation and verification; and
-  - a pull request is the default when the user does not set an earlier endpoint.
-- Do not proceed beyond the chosen endpoint. Explicit invocation authorizes the complete green path
-  only when the user has not limited it, and routine implementation choices already follow from the
-  established contract.
-- Never merge, enable auto-merge, publish a release, or run the migrated CLI against real data.
+If this skill and the current repository documents ever disagree, follow the repository documents and
+report the skill drift before continuing.
 
-For a named verification, preserve the current checkout and Git refs, run only the named check,
-report its result, and stop without entering the roadmap workflow below.
+## Invocation boundary
 
-## Load the source of truth
+- Run this workflow only after the user explicitly invokes `$skills-reconcile-roadmap-pr`.
+- Never infer invocation from a general request to discuss, review, or edit the repository.
+- Work on exactly one item that exists in the current `docs/plan/pr-roadmap.md`.
+- If the user names an obsolete or missing item, do not map it to a new item by guesswork. Report that
+  it is no longer in the current roadmap and ask which current item to use.
 
-Before continuing with the roadmap workflow, read:
+Choose the endpoint from the user's request before taking action:
+
+| Endpoint              | Allowed result                                                               |
+| --------------------- | ---------------------------------------------------------------------------- |
+| Named verification    | Run only the named check on the current checkout                             |
+| Investigation         | Report the working contract and any blocking decision without changing files |
+| Verified local change | Implement and verify, then stop before commit, push, and PR creation         |
+| Pull request          | Implement, verify, commit, push, and create a non-draft PR; never merge it   |
+
+When the user explicitly invokes the skill without choosing an earlier endpoint, the pull request is
+the default. A narrower instruction always wins.
+
+## Reload the current source of truth
+
+Before selecting or implementing an item, read:
 
 1. the repository-root `AGENTS.md`;
 2. `docs/plan/README.md`;
@@ -44,148 +49,133 @@ Before continuing with the roadmap workflow, read:
 4. `docs/plan/cli-contract.md`;
 5. `docs/plan/safety-and-verification.md`;
 6. `docs/plan/scope-and-compatibility.md`;
-7. the repository pull request template; and
-8. any item-specific documentation or instructions discovered from those files.
+7. item-specific documents referenced by those files; and
+8. the pull request template, only when the selected endpoint can publish a PR.
 
-Treat the approved plan and the pinned dependency's public boundary as `AGENTS.md` defines them.
-Inspect the migration inventory read-only to locate candidate capabilities and dependencies. Never use
-its implementation, tests, or output to justify a contract, and never copy Skill bodies, real manifests,
-machine state, credentials, or user-specific configuration into the destination.
+Use the current files, not remembered content or example IDs in evals. Inspect implementation,
+tests, dependencies, and Git history only to understand the present repository state. They cannot
+override an approved product contract.
 
-## Run preflight
+## Handle limited endpoints first
 
-1. Confirm that the working directory belongs to `skills-reconcile` and inspect the current branch,
-   worktree status, remotes, and recent history.
-2. Preserve unrelated user changes. Do not stash, reset, discard, or incorporate them. Stop if they
-   prevent an isolated change.
-3. When implementing an item, fetch the remote. For a regular pull request or stack root, confirm the
-   base equals the latest successful `main`. For a later layer in an explicitly requested stack,
-   confirm the stack root has that base and the immediate base is the preceding item's branch.
-4. In a regular workflow, confirm the preceding roadmap item is merged and there is no open feature
-   pull request on which this item would depend. In an explicitly requested stack, confirm each open
-   dependency is an earlier layer of that same stack and follows roadmap order. Before implementing a
-   user-facing command against an open contract layer, also confirm a maintainer explicitly approved
-   that contract PR's exact current head and record the commit and approval evidence in the dependent
-   PR body. Review completion, resolved threads, and stack position are not approval; a new contract
-   commit requires approval again.
-5. When implementing or investigating an item, identify exactly one roadmap item. Stop if repository
-   history and the roadmap do not identify one unambiguous next item.
-6. When implementing an item, create a new branch from that base. Use a stack only when the user has
-   explicitly requested one, and keep every layer buildable and reviewable on its immediate base.
+For a named verification, preserve the checkout and Git refs, run only the requested check, report the
+result, and stop. Do not select a roadmap item, refresh the base, create a branch, or load unrelated
+implementation context.
 
-For an investigation endpoint, do not fetch or update Git refs; use read-only remote or GitHub
-API queries when freshness is needed, and report that the local base was not refreshed.
+For investigation, keep all operations read-only. Do not fetch or update Git refs. Read-only remote or
+GitHub queries are acceptable when freshness is necessary, but state that the local base was not
+refreshed. Report the working contract and stop before implementation.
 
-## Establish the contract before implementation
+## Run preflight for implementation
 
-Inspect the approved product contract, the current destination code, and the public boundary of any
-dependency involved. Use the migration inventory only to locate candidate scope. Then state a compact
-working contract in a commentary update with:
+1. Confirm that the working directory is the intended `skills-reconcile` repository.
+2. Inspect the current branch, worktree status, remotes, recent history, and current roadmap.
+3. Preserve unrelated user changes. Never stash, reset, discard, or absorb them. Stop if they prevent
+   an isolated change.
+4. Identify exactly one current roadmap item. If no single item follows unambiguously, stop and show
+   the competing interpretations.
+5. Confirm that every prerequisite named by the current roadmap is satisfied.
+6. For a regular PR or the root of an explicitly requested stack, start from the latest successful
+   `main`. Use a stack only when the user explicitly requests one. A later stack layer must use the
+   preceding layer as its direct base.
+7. Before implementing a user-facing interface, confirm that the current `cli-contract.md` contains
+   the complete, approved contract required by `AGENTS.md`. A roadmap label is not a CLI contract.
+
+Do not translate an old roadmap ID into a current one or assume that an unfinished contract item is
+approval to choose product behavior.
+
+## Establish one working contract
+
+Before editing, provide a concise commentary update containing:
 
 | Field          | Required content                                                     |
 | -------------- | -------------------------------------------------------------------- |
-| Scope          | One user-visible behavior or one roadmap responsibility              |
-| Out of scope   | Deferred flags, commands, fixes, refactors, and dependencies         |
-| Acceptance     | Observable success and explicit failure conditions                   |
-| Expected files | Source, tests, fixtures, configuration, and documentation            |
+| Item           | Exact current roadmap ID and responsibility                          |
+| Scope          | One approved behavior or one bounded foundation change               |
+| Out of scope   | Deferred behavior and unresolved future phases                       |
+| Acceptance     | Observable success and explicit failures                             |
+| Expected files | Source, tests, fixtures, configuration, and docs                     |
 | Estimated size | Implementation, tests/fixtures, generated files, and docs separately |
-| Verification   | Targeted, full, Nix, container, policy, and manual checks that apply |
+| Verification   | Checks required by the current safety document and affected tooling  |
 
-Continue without waiting when the contract is supported consistently, fits the roadmap item, and
-meets all gates below. For a user-facing command in an open stack, this includes exact-head contract
-approval from a maintainer. The commentary update is an audit trail, not approval evidence.
+This update records the interpretation; it does not create a missing product contract.
 
 ## Stop for a material decision
 
-Stop before commit, push, or pull request creation when any of these conditions appears:
+Stop before implementation or publication when any of these is true:
 
-- approved product contracts, current destination behavior, or a dependency's public boundary
-  disagree about the same input;
-- behavior appears defective or requires a bug fix, specification change, general refactor, or
-  unrelated dependency update;
-- more than one roadmap item is needed for a buildable or testable change;
-- non-test implementation is estimated or actually measured above 500 changed lines;
-- total hand-written implementation, tests, and fixtures exceeds 1,000 changed lines without a
-  reviewed split decision;
-- real HOME, XDG state, installed Skills, manifests, credentials, Docker socket, or other real user
-  or workspace data would be required;
-- destructive ownership, deletion targets, or required test isolation cannot be proven;
-- in a regular workflow the previous feature pull request is unmerged, or in an explicitly requested
-  stack the root or immediate-base relationship fails the preflight rules;
-- an open contract layer required by a user-facing command lacks explicit maintainer approval for its
-  current head, or the dependent PR body lacks the commit and approval evidence;
-- `main` is failing or a required verification path remains unavailable or unresolved;
-- the outgoing branch, commit, or pull request would expose private or machine-specific data; or
-- a choice would materially alter the approved scope or user-visible contract.
+- the selected item or its prerequisite is missing, obsolete, ambiguous, or incomplete;
+- the current plan, CLI contract, repository instructions, implementation, or required dependency
+  boundary disagree about user-visible behavior;
+- completing the item requires selecting an undecided command, output, filesystem, TUI, copy, or
+  compatibility policy;
+- more than one roadmap responsibility is required for a buildable or reviewable change;
+- the current line-count or change-size gates would be exceeded;
+- real user data, installed Skills, credentials, or an unapproved write path would be required;
+- unrelated worktree changes prevent an isolated diff;
+- a required base, prerequisite PR, CI result, or exact contract approval cannot be established;
+- public branch, commit, or PR content would expose private or machine-specific data; or
+- the user's requested endpoint or authority does not permit the next action.
 
-Provide the smallest reproduction or exact evidence, the competing interpretations, their effects,
-whether they can be separated within the line gate, and a recommended option. Do not assume the
-answer.
+Report concrete evidence, the available interpretations, their effects, and one recommendation. Do
+not invent missing decisions to keep the workflow moving.
 
-Routine formatting, compilation, lint, or test failures caused by an in-scope mistake are not
-material decisions. Fix them, rerun the affected checks, and continue. Retry a transient command
-failure when doing so cannot change the contract or touch real data.
+Routine in-scope formatting, compilation, lint, or test failures are not product decisions. Fix the
+mistake, rerun affected checks, and continue within the established contract.
 
-At an investigation endpoint, report the working contract, findings, and any decision needed, then
-stop before implementation. Do not create a branch or change files, commits, or pull requests.
+## Implement the selected item
 
-## Implement one item
+- Implement only the current item's approved responsibility.
+- Keep future roadmap phases out of the design until their contracts are approved.
+- For user-facing interfaces, implement only the exact grammar, outputs, statuses, and side effects in
+  the current CLI contract.
+- Add the behavior's tests and synthetic fixtures in the same change.
+- Use only test-owned temporary directories and synthetic data where the current safety document
+  requires isolation.
+- Reject unsupported inputs explicitly when required by the current contract.
+- Prefer the smallest reader-oriented design; do not add speculative abstractions or compatibility
+  layers for discarded behavior.
+- Keep every review boundary buildable and testable.
+- Update roadmap completion records only when the current plan assigns that update to this item.
 
-- Implement the approved behavior in the destination's responsibility boundary. Preserve the
-  destination CLI/module names and the dependency order in the plan.
-- For a user-facing command, implement only grammar, flags, status semantics, output, and side effects
-  already approved in `docs/plan/cli-contract.md`. A roadmap item name is not an interface contract.
-- Add synthetic fixtures and failure-path tests with the behavior. Keep unsupported CLI commands,
-  positional arguments, and flags explicit rather than silently accepting them.
-- Make the smallest reader-oriented change that satisfies the established contract. Do not add
-  speculative abstractions or compatibility aliases.
-- Keep the migration inventory read-only and the destination buildable at every review boundary.
-- Do not update roadmap completion records before the feature pull request is merged unless the plan
-  explicitly assigns that documentation to the selected item.
+## Verify against the current plan
 
-## Verify before publication
+Derive the exact checks from the current item, `AGENTS.md`, and
+`docs/plan/safety-and-verification.md`; do not rely on a fixed historical checklist embedded here.
+At minimum when applicable:
 
-Run the checks required by the selected phase and the repository's current tooling. At minimum:
+1. run targeted tests during implementation and relevant full tests afterward;
+2. run formatting, static analysis, documentation lint, and `git diff --check`;
+3. run the currently required Go, Nix, container, or package smoke paths;
+4. compare the final diff with the correct base and calculate the current line-count categories;
+5. verify that tests use synthetic, isolated inputs and that read-only behavior performs no writes;
+6. inspect the final status and diff for scope creep, accidental files, secrets, user paths, and
+   stale terminology; and
+7. record any planned check that is not yet available instead of inventing a substitute.
 
-1. run targeted tests while implementing, then the applicable full Go, Nix, and container checks;
-2. run write-capable integration scenarios only inside the isolated container with synthetic HOME,
-   XDG directories, fixtures, and fake external processes;
-3. run formatting, static analysis, repository security/policy checks, and `git diff --check`;
-4. compare the final diff to the merge base and calculate the plan's separate line-count categories;
-5. confirm no prohibited paths, Skill bodies, real state, credentials, absolute user paths, or build
-   artifacts are tracked; and
-6. inspect the final status and diff for scope, test coverage, accidental files, and public-output
-   privacy.
+Do not run against real user state merely to strengthen a PR check. A manual real-state check is
+allowed only when the current safety contract permits it and the user explicitly requests it.
 
-Never substitute a host-side write test for the required container boundary. If a phase does not yet
-provide one of the planned check paths, record that fact accurately rather than inventing a command.
+For a verified local change, stop after successful verification unless the user separately requested
+a local commit. Report the branch, worktree state, diff, checks, and the next unpublished action.
 
-At a verified local change endpoint, honor an explicitly requested local commit only after the
-checks pass; otherwise leave the verified diff in the worktree. Report the branch, worktree and
-commit state, diff summary, checks run, and the next action that would require authorization, then
-stop before publication.
+## Publish only at the PR endpoint
 
-## Publish the green path
-
-Only the pull request endpoint enters this sequence. Proceed when every applicable local
-check passes and no material decision remains:
+When all current gates pass and no material decision remains:
 
 1. create a focused semantic commit;
-2. push the branch with the approved regular or stacked workflow;
-3. fill the repository pull request template, including the contract, deliberate exclusions,
-   verification results, actual line-count categories, and any carry-over;
-4. remove placeholders and private or machine-specific details from all public text;
-5. create a pull request without a draft flag; and
-6. query the created pull request and confirm its base, head, URL, body, and `isDraft: false`.
+2. push with the repository's approved regular or explicitly requested stacked workflow;
+3. fill the current PR template with scope, exclusions, verification, actual line counts, and
+   carry-over;
+4. remove placeholders and private or machine-specific details from public text;
+5. create a non-draft PR; and
+6. verify the PR's base, head, URL, body, and draft state.
 
-If CI or review later exposes a routine in-scope defect, fix it on the same branch and reverify. If it
-exposes a material decision, leave the pull request open, do not merge it, and present the
-same evidence and options required by the stop gate.
+Never merge, enable auto-merge, or publish a release. If CI or review reveals a material product
+decision, leave the PR open and report the evidence instead of broadening the change.
 
 ## Report the result
 
-Use the endpoint-specific reports above for named verification, investigation, and verified local
-changes. On published success, report the pull request URL, branch and commit, selected roadmap item,
-changed files, actual line-count categories, checks run, and deliberately deferred scope. On a
-material stop path, report what remains unchanged or unpublished and the exact user decision needed
-to continue.
+For every endpoint, state the selected current roadmap item when one was required, what changed or
+remained unchanged, checks run, Git and PR state, and deliberately deferred scope. On a stop path,
+state the exact decision needed to continue.

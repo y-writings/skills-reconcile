@@ -1,74 +1,51 @@
 <!-- markdownlint-disable MD013 -->
 
-# CLI契約
+# CLI 契約
 
 ## 位置づけ
 
-この文書は `skills-reconcile` の利用者向けinterfaceの正本である。ここへ明記され、先行する文書PRで
-承認されたentryだけを実装できる。PRロードマップにあるcommand名は実装範囲を示すlabelであり、
-grammar、flag、終了status、出力または副作用を定義しない。
+この文書は、`skills-reconcile` の利用者向け interface を実装する前に確定する契約の置き場所である。
+完全な grammar、終了 status、stdout と stderr、副作用、未対応入力がここで承認されるまで、対応する
+command を実装しない。
 
-CLI entryを追加または変更するPRは文書だけで作成し、対応する実装PRより先行させる。regular
-workflowでは実装着手前にmergeする。explicitなstackでは、契約PRを実装PRの直接のbaseにできる。
-この場合は、maintainerが契約PRの正確なhead
-commitを明示的に承認し、依存する実装PRの本文へcommitと承認の所在を記録してから実装を開始する。
-reviewの依頼・完了、thread解決、branchの位置だけを承認と扱わない。契約PRのheadが変わった時点で
-承認は失効し、更新後のheadを再承認するまで依存実装を進めない。契約と実装を同じPRで新規決定しない。
+## 契約のリセット
 
-各entryは、少なくとも次をすべて定義する。
+旧ロードマップで定義していた `doctor`、`plan`、`add`、`remove`、`apply`、`prune`、`adopt`、
+`migrate`、`capture` の契約と追加順序はすべて破棄する。
 
-- 完全なcommand grammarとpositional argument
-- global flagとsubcommand flag、そのdefault、排他条件
-- 成功、差分あり、入力不正、競合、外部process失敗の終了status
-- stdoutとstderrの使い分け、およびtext outputの安定性
-- machine-readable outputのschema、順序、nullability、未知field方針
-- filesystemと外部processの副作用、確認条件、dry-runの意味
-- 未対応の入力と、互換性を持たせない入力
+現在のソースコードに存在する最小 `--help` 挙動は、旧計画の途中状態であり、新製品の将来契約を
+決める根拠にはしない。新しい一覧 command の契約が承認されるまでは、新しい利用者向け interface を
+追加しない。
 
-entryにないcommand、flag、argument、status、fieldを実装者が補ってはならない。必要になった場合は、
-対応する契約entryを先に承認する。
+## 次に決める契約
 
-## 現在承認済みのinterface
+### N01: `$HOME/.agents/skills` の一覧表示
 
-現時点で承認済みなのは、フェーズ1で実装した最小CLIだけである。
+最初の実装 PR より前に、文書だけの変更で次を確定する。
 
-### `skills-reconcile --help`
+- command 名と完全な argument grammar
+- `$HOME/.agents/skills` の解決方法
+- 一覧上で一つの Skill と認識する条件
+- 通常ディレクトリ、symlink、壊れた symlink、`SKILL.md` がない entry の扱い
+- 読み取り不能、対象ディレクトリなし、一覧が空の場合の扱い
+- 表示する field と決定的な並び順
+- stdout と stderr の使い分け
+- 成功と失敗の終了 status
+- text output の安定性と、machine-readable output を最初から提供するかどうか
+- 未対応の flag、positional argument、環境変数
+- ファイルを一切変更しないこと
 
-- argument vectorが正確に `--help` 一つの場合だけ成功する。
-- 終了statusは0、stderrは空とし、stdoutへ次を出力する。
+ロードマップは上記の論点を列挙するだけで、答えを暗黙に決めない。N01 の exact head が承認された後に
+だけ、対応する CLI 実装へ進む。
 
-```text
-Usage: skills-reconcile --help
+## 後で決める契約
 
-No commands are available in this migration phase.
-```
+次の interface は、一覧表示の完成後まで設計しない。
 
-### 引数なし
+- 複数の Skill 配置先を走査する interface
+- TUI の検索、フィルタリング、選択操作
+- コピー元とコピー先を指定する interface
+- 衝突、上書き、更新、削除の扱い
+- リポジトリから各 Agent へ反映する interface
 
-- 終了statusは1、stdoutは空とする。
-- stderrへ `skills-reconcile: usage: skills-reconcile --help` と改行を出力する。
-
-### その他の入力
-
-- `--version`、将来command名、`--help`の後続argumentを含め、その他のargument vectorは未対応とする。
-- 終了statusは1、stdoutは空とする。
-- stderrへ `skills-reconcile: unsupported command or option %q` の `%q` を先頭argumentのGo quoted stringで
-  置換し、改行を付けて出力する。
-
-## 契約を追加する順序
-
-| ID  | 対象interface                   | 実装前の承認期限 | 必須内容                                                      |
-| --- | ------------------------------- | ---------------- | ------------------------------------------------------------- |
-| K01 | `doctor`                        | C07より前        | grammar、全flag、status、診断code、text/JSON schema           |
-| K02 | `plan`                          | R05より前        | grammar、全flag、status、action/status集合、text/JSON schema  |
-| K03 | `add`、`remove`                 | M02より前        | grammar、全flag、status、dry-run、manifest更新、text/JSON出力 |
-| K04 | `apply`、`apply --prune`        | A01より前        | grammar、全flag、status、確認条件、外部process、副作用、出力  |
-| K05 | workspace向け既存command拡張    | W14より前        | 入力kind、status追加、text/JSON schema拡張、互換性            |
-| K06 | `adopt`の全mode                 | T01より前        | grammar、全flag、status、copy/ownership副作用、dry-run、出力  |
-| K07 | `migrate`、schema v1の`capture` | L01より前        | grammar、全flag、status、入力schema、変換結果、副作用、出力   |
-
-K01からK07は契約を決めるPRであり、command実装を含めない。各実装PRは対応entryへlinkし、black-box testで
-grammar、終了status、stdout/stderr、machine-readable schema、副作用を固定する。
-
-F02は、K01からK07で承認済みのentryと実装・利用文書が一致することを監査する。F02で新しいcommand、
-flag、status、output fieldを初めて決めない。
+command 名だけをロードマップへ先に置いて、grammar や副作用を実装者に推測させない。
