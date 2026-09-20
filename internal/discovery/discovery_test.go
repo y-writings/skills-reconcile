@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 )
@@ -12,7 +13,7 @@ import (
 func TestSkillNamesRecognizesDirectSkillDirectories(t *testing.T) {
 	root := newScanRoot(t)
 	writeSkill(t, root, "middle", "---\nname: middle\n---\n")
-	writeSkill(t, root, "Zed", "")
+	writeSkill(t, root, "zed", "")
 	writeSkill(t, root, "alpha", "not validated")
 
 	mustWriteFile(t, filepath.Join(root, "plain-file"), []byte("ignored"), 0o600)
@@ -34,9 +35,51 @@ func TestSkillNamesRecognizesDirectSkillDirectories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"Zed", "alpha", "middle"}
+	want := []string{"alpha", "middle", "zed"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("SkillNames() = %q, want %q", got, want)
+	}
+}
+
+func TestSkillNamesAcceptsOnlyContractNameSyntax(t *testing.T) {
+	root := newScanRoot(t)
+	maximumLengthName := strings.Repeat("a", 64)
+	for _, name := range []string{"0", "a-b", maximumLengthName} {
+		writeSkill(t, root, name, "")
+	}
+	for _, name := range []string{
+		"Uppercase",
+		"with_underscore",
+		"with.dot",
+		"-leading",
+		"trailing-",
+		"double--hyphen",
+		strings.Repeat("a", 65),
+		"non-ascii-é",
+	} {
+		writeSkill(t, root, name, "")
+	}
+
+	got, err := SkillNames(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"0", "a-b", maximumLengthName}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("SkillNames() = %q, want %q", got, want)
+	}
+}
+
+func TestSkillNamesIgnoresInvalidNamesBeforeInspection(t *testing.T) {
+	root := newScanRoot(t)
+	mustSymlink(t, filepath.Join(t.TempDir(), "missing"), filepath.Join(root, "broken_link"))
+
+	got, err := SkillNames(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("SkillNames() = %q, want empty", got)
 	}
 }
 

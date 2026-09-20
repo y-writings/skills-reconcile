@@ -6,8 +6,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 )
+
+var skillNamePattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 // SkillNames returns the names of Skills directly below scanRootPath.
 func SkillNames(scanRootPath string) ([]string, error) {
@@ -18,6 +21,10 @@ func SkillNames(scanRootPath string) ([]string, error) {
 
 	var skillNames []string
 	for _, entry := range entries {
+		if !isSkillName(entry.Name()) {
+			continue
+		}
+
 		entryPath := filepath.Join(scanRootPath, entry.Name())
 		entryInfo, err := os.Stat(entryPath)
 		if err != nil {
@@ -41,4 +48,8 @@ func SkillNames(scanRootPath string) ([]string, error) {
 
 	sort.Strings(skillNames)
 	return skillNames, nil
+}
+
+func isSkillName(name string) bool {
+	return len(name) <= 64 && skillNamePattern.MatchString(name)
 }
