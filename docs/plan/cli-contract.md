@@ -4,9 +4,8 @@
 
 ## 位置づけ
 
-この文書は、`skills-reconcile` の利用者向け interface を実装する前に確定する契約の置き場所である。
-完全な grammar、終了 status、stdout と stderr、副作用、未対応入力がここで承認されるまで、対応する
-command を実装しない。
+この文書は、`skills-reconcile` の利用者向け interface について、承認済みの決定を置く場所である。
+ここにない利用者向け挙動を実装者が補わない。
 
 ## 契約のリセット
 
@@ -21,9 +20,17 @@ command を実装しない。
 
 ### N01: `$HOME/.agents/skills` の一覧表示
 
-最初の実装 PR より前に、文書だけの変更で次を確定する。
+#### 決定済み
 
-- command 名と完全な argument grammar
+- 一覧 command の名前は `list` とする。
+- argument vector の先頭が `list` の場合に一覧処理を選択する。
+- `list` より後ろの argument は、最初の実装では解釈も検証もしない。
+- 一覧処理はファイルを一切変更しない。
+
+#### 未決事項
+
+実装前に、次のうち実装へ必要な挙動を順次決める。
+
 - `$HOME/.agents/skills` の解決方法
 - 一覧上で一つの Skill と認識する条件
 - 通常ディレクトリ、symlink、壊れた symlink、`SKILL.md` がない entry の扱い
@@ -32,11 +39,9 @@ command を実装しない。
 - stdout と stderr の使い分け
 - 成功と失敗の終了 status
 - text output の安定性と、machine-readable output を最初から提供するかどうか
-- 未対応の flag、positional argument、環境変数
-- ファイルを一切変更しないこと
 
-ロードマップは上記の論点を列挙するだけで、答えを暗黙に決めない。N01 の exact head が承認された後に
-だけ、対応する CLI 実装へ進む。
+ロードマップは上記の論点を列挙するだけで、答えを暗黙に決めない。N01 の契約が承認された後にだけ、
+対応する CLI 実装へ進む。
 
 ## 後で決める契約
 

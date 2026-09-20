@@ -6,7 +6,7 @@
 
 - Before product or implementation work, read `docs/plan/README.md`, `docs/plan/cli-contract.md`, and the plan document relevant to the task.
 - Treat only behavior explicitly approved in `docs/plan/**` as product authority. Existing code, tests, previous roadmap IDs, and legacy documents do not define the new product.
-- Do not implement a user-facing command until its complete grammar, exit statuses, stdout/stderr behavior, side effects, and unsupported inputs are approved in `docs/plan/cli-contract.md`.
+- Do not implement user-facing behavior that has not been approved in `docs/plan/cli-contract.md`.
 - The CLI and Go module remain `skills-reconcile` and `github.com/y-writings/skills-reconcile` unless a later approved contract changes them.
 
 ## Current product direction
@@ -32,6 +32,5 @@
 - Start each regular feature PR from the latest successful `main`. Create a stack only when explicitly requested, with each layer based on the preceding layer.
 - Keep hand-written non-test implementation changes at or below 500 added-plus-deleted lines. Count workflows, scripts, and executable configuration as implementation.
 - Keep implementation and its tests in the same PR. If hand-written implementation, tests, and fixtures exceed 1,000 added-plus-deleted lines, stop and review whether the change contains more than one responsibility.
-- Unsupported commands, positional arguments, and flags must fail explicitly instead of being ignored.
 - Do not preserve obsolete behavior through compatibility aliases or speculative abstractions.
 - Follow `docs/plan/safety-and-verification.md` before requesting review or merge.
