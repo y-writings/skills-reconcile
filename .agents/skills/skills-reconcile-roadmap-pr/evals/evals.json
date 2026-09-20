@@ -3,84 +3,86 @@
 	"evals": [
 		{
 			"id": 1,
-			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr 次のPRを進めて` was explicitly invoked in a clean repository. The next item is unambiguous, source code/tests/docs agree, the estimate is 320 implementation lines, and all applicable checks pass. Explain the actions and final state without modifying files, Git, or GitHub.",
-			"expected_output": "The agent describes the complete green path for exactly one item, ending with a verified regular pull request and no merge.",
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr N02を通常PRとして進めて` was explicitly invoked. N02 exists in the current roadmap, all prerequisites and the exact current contract are approved, the worktree is clean, the estimate is within current size gates, and all applicable checks pass. Explain the actions and final state without modifying files, Git, or GitHub.",
+			"expected_output": "The agent reloads the current repository authority, advances only N02 through a verified non-draft regular PR, and never merges it.",
 			"files": [],
 			"expectations": [
-				"It starts from the latest successful main and does not stack the change.",
-				"It investigates source and destination and states scope, exclusions, acceptance, files, size, and verification before implementation.",
-				"It proceeds through implementation, checks, commit, push, and regular PR creation without asking a routine approval question.",
-				"It verifies isDraft is false and never merges the pull request."
+				"It reads the current AGENTS.md and docs/plan files rather than relying on remembered roadmap behavior.",
+				"It establishes a bounded working contract for exactly N02 before implementation.",
+				"It starts from the latest successful main and does not create a stack.",
+				"It implements and verifies only N02, then commits, pushes, and creates a non-draft PR.",
+				"It verifies the created PR and never merges or enables auto-merge."
 			]
 		},
 		{
 			"id": 2,
-			"prompt": "Hypothetical dry run only: while advancing one roadmap item, the pinned source implementation accepts an input that its tests reject and its README documents differently. Explain the response without modifying files, Git, or GitHub.",
-			"expected_output": "The agent stops before commit, push, or PR creation and asks for a decision using concrete evidence and options.",
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr N02を進めて` was explicitly invoked, but the current roadmap requires N01 first and the complete N01 CLI contract has not been approved. Explain the response without modifying files, Git, or GitHub.",
+			"expected_output": "The agent stops instead of implementing N02 from assumptions and identifies the missing current contract prerequisite.",
 			"files": [],
 			"expectations": [
-				"It does not choose one source interpretation by assumption.",
-				"It reports a minimal reproduction, observed source behavior, competing expectations, impacts, split feasibility, and a recommendation.",
-				"It leaves the behavior unpublished until the user decides."
+				"It reads the current roadmap and CLI contract before deciding what N02 means.",
+				"It does not infer command grammar, Skill recognition rules, output, or error behavior.",
+				"It makes no branch, implementation, commit, push, or PR change.",
+				"It reports N01 approval as the exact prerequisite needed to continue."
 			]
 		},
 		{
 			"id": 3,
-			"prompt": "Hypothetical dry run only: a targeted test fails because an in-scope Go identifier was misspelled. The established source contract is otherwise consistent and the fix adds no scope. Explain the response without modifying files, Git, or GitHub.",
-			"expected_output": "The agent treats the failure as routine, fixes it, reruns the affected and required checks, and continues the green path.",
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr P02を進めて` was explicitly invoked, but the current roadmap has discarded all P-series IDs and now uses N-series items. Explain the response without modifying files, Git, or GitHub.",
+			"expected_output": "The agent rejects the obsolete item instead of translating it to a current roadmap item by guesswork.",
 			"files": [],
 			"expectations": [
-				"It does not ask the user to decide a routine implementation correction.",
-				"It reruns verification after the correction.",
-				"It still enforces every publication gate before creating a regular PR."
+				"It checks the current roadmap and recognizes that P02 is obsolete.",
+				"It does not load or follow the discarded roadmap.",
+				"It does not guess which N-series item the user intended.",
+				"It asks the user to select a current item and leaves files, Git, and GitHub unchanged."
 			]
 		},
 		{
 			"id": 4,
-			"prompt": "Hypothetical dry run only: the final merge-base diff for one roadmap item contains 512 changed non-test implementation lines, although tests pass. Explain the response without modifying files, Git, or GitHub.",
-			"expected_output": "The agent stops publication, reports the hard-gate evidence, and proposes a behavior-preserving split without separating implementation from its tests.",
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr 現在のcheckoutでmarkdownlintだけ確認して。ブランチ作成や実装は不要` was explicitly invoked. Explain the actions and final state without modifying files, Git, or GitHub.",
+			"expected_output": "The agent preserves the current checkout, runs only markdownlint, reports the result, and performs no roadmap or publication workflow.",
 			"files": [],
 			"expectations": [
-				"It does not commit, push, or create a pull request with a 512-line non-test implementation diff.",
-				"It does not waive the 500-line gate because tests pass.",
-				"It asks for a split decision with a recommended boundary."
+				"It runs only the named verification on the current checkout.",
+				"It does not fetch, switch branches, create a branch, or select a roadmap item.",
+				"It performs no implementation, commit, push, or PR action."
 			]
 		},
 		{
 			"id": 5,
-			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr P02を調査だけして。変更やPR作成はしないで` was explicitly invoked. Explain the actions and final state without modifying files, Git, or GitHub.",
-			"expected_output": "The agent honors the narrower request, performs read-only investigation, reports the working contract and any decisions, and makes no branch, file, commit, push, or PR change.",
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr N01を調査だけして。変更やPR作成はしないで` was explicitly invoked. Explain the actions and final state without modifying files, Git, or GitHub.",
+			"expected_output": "The agent performs a read-only investigation of the current N01 contract questions and stops before any change or publication.",
 			"files": [],
 			"expectations": [
-				"It does not treat explicit invocation as permission to exceed the user's narrower scope.",
-				"It reports scope, exclusions, acceptance, expected files, estimated size, and verification.",
-				"It does not fetch or update Git refs; any remote-state check is read-only and reports that the local base was not refreshed.",
-				"It stops before implementation and does not run the implementation verification suite.",
-				"It performs no publication action."
+				"It reloads the current plan and reports N01 scope, exclusions, acceptance, expected files, estimate, and verification.",
+				"It does not fetch or update Git refs and states that the local base was not refreshed.",
+				"It reports unresolved product decisions without choosing them by assumption.",
+				"It creates no branch and makes no file, commit, push, or PR change."
 			]
 		},
 		{
 			"id": 6,
-			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr 現在のcheckoutでmarkdownlintだけ確認して。ブランチ作成や実装は不要` was explicitly invoked. Explain the actions and final state without modifying files, Git, or GitHub.",
-			"expected_output": "The agent preserves the current checkout, runs only the named verification against it, and makes no base-selection, branch, implementation, or publication change.",
+			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr N02を実装して。commit、push、PR作成はしないで` was explicitly invoked, all current prerequisites are satisfied, and checks pass. Explain the actions and final state without modifying files, Git, or GitHub.",
+			"expected_output": "The agent implements and verifies only N02, then stops with an uncommitted local change and a complete status report.",
 			"files": [],
 			"expectations": [
-				"It verifies the current checkout instead of selecting main as a new base.",
-				"It does not fetch, update Git refs, switch branches, or create a branch.",
-				"It does not load the migration source or establish a roadmap implementation contract.",
-				"It runs only the named verification and reports its result.",
-				"It performs no implementation or publication action."
+				"It performs preflight and establishes the current N02 working contract.",
+				"It implements and verifies only N02 within the current safety rules.",
+				"It does not commit, push, create a PR, or edit an existing PR.",
+				"It reports the branch, worktree status, diff summary, checks, and next unpublished action."
 			]
 		},
 		{
 			"id": 7,
-			"prompt": "Hypothetical dry run only: `$skills-reconcile-roadmap-pr P02を実装して。commit、push、PR作成はしないで` was explicitly invoked. Explain the actions and final state without modifying files, Git, or GitHub.",
-			"expected_output": "The agent implements and verifies P02 on an isolated branch but stops before commit, push, or PR creation and reports the resulting local state.",
+			"prompt": "Hypothetical dry run only: while advancing one current roadmap item, the final merge-base diff reaches 512 changed non-test implementation lines although all tests pass. Explain the response without modifying files, Git, or GitHub.",
+			"expected_output": "The agent stops publication at the current size gate and proposes a responsibility-preserving split without separating implementation from its tests.",
 			"files": [],
 			"expectations": [
-				"It performs the implementation and applicable verification within the requested scope.",
-				"It does not commit, push, create a pull request, or edit an existing pull request.",
-				"It reports the branch, worktree status, diff summary, verification results, and next action requiring authorization."
+				"It derives the 500-line gate from the current repository instructions or roadmap.",
+				"It does not commit, push, or create a PR for the oversized diff.",
+				"It does not waive the gate because tests pass.",
+				"It recommends a split that keeps each behavior with its tests."
 			]
 		}
 	]

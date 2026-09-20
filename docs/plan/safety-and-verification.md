@@ -2,200 +2,83 @@
 
 # 安全性と検証
 
-## 実行境界
+## 現在の安全境界
 
-移行作業中の機能検証はコンテナ内で行う。リポジトリは `/workspace` へ mount してよいが、利用者の
-ホームディレクトリ、`.agents`、各 agent の設定 directory、実際の XDG directory、Docker socket は
-mount しない。
+最初のマイルストーンは読み取り専用である。`$HOME/.agents/skills` の一覧表示は、Skill、設定、lock、
+state、Git repository を作成、変更、移動、削除してはならない。
 
-コンテナ内では、少なくとも次の値を専用の一時領域へ固定する。
-
-| 状態       | コンテナ内の例                     | host から引き継がないもの                   |
-| ---------- | ---------------------------------- | ------------------------------------------- |
-| HOME       | `/tmp/skills-reconcile-home`       | `$HOME/.agents` と agent ごとの Skill       |
-| XDG config | `/tmp/skills-reconcile-xdg/config` | 実 workspace 設定                           |
-| XDG state  | `/tmp/skills-reconcile-xdg/state`  | 外部CLIのprivate state、receipt、projection |
-| XDG cache  | `/tmp/skills-reconcile-xdg/cache`  | npm や CLI の既存 cache                     |
-| manifest   | テストごとの一時 workspace         | 実運用の `skills-manifest.json`             |
-
-テストは開始時に空の一時 root を作り、終了時はコンテナごと破棄する。固定した `skills` CLI の
-install/remove を使う統合テストも、この root の外へ書き込めない構成にする。
-
-## コンテナ方針
-
-- 計画で固定したGo、Node.js、`skills` CLIのversionを使う。
-- base image と GitHub Actions は移行先の既存方針に合わせて immutable な digest/SHA で固定する。
-- `npm ci --ignore-scripts` で lockfile から依存関係を再現する。
-- `SKILLS_RECONCILE_EXECUTABLE` はコンテナ内の固定済み executable だけを指す。
-- `npx skills` や host の `PATH` 上に偶然存在する executable は使わない。
-- ローカルと CI は同じ build/test entrypoint を使い、CI 専用の別手順を増やさない。
-- 開発用 image に認証情報を bake せず、ネットワークを必要とするのは image build 時の依存取得に
-  限定する。
-
-## Nixとコンテナの責務
-
-Nixは `skills-reconcile` を再現可能にbuild・install・実行する配布経路とする。コンテナはHOMEやXDG
-stateへの副作用を隔離し、実際のinstall、prune、adoptを検証する実行境界とする。Nix buildがsandbox
-内で成功することは、CLIをhostの実状態に対して安全に実行できることを意味しないため、書き込み系の
-統合テストは引き続きコンテナ内だけで行う。
-
-Nix packageでは次を検証する。
-
-- `nix flake check`
-- `nix build .#skills-reconcile`
-- build結果の `bin/skills-reconcile` に対する最小smoke test
-- `nix run .#skills-reconcile -- --help` 相当のapp output
-- package内で固定したnpm版 `skills` とNode.jsを解決でき、repoの `node_modules` に依存しないこと
-- package closureにSkill本体、実manifest、端末固有stateが含まれないこと
-
-LinuxとDarwin、x86_64とaarch64のpackage/app outputをflakeで定義する。必須CIでは少なくともLinuxの
-buildを実行し、利用対象となるDarwinについてもrunnerまたは合意したローカルNix環境で確認する。
-全system向けoutputの評価と、現在のsystemで実際にbuildできることを混同しない。
+テストは実 HOME を使用せず、テストごとの一時ディレクトリに合成した `.agents/skills` を作成する。
+実在する Skill 本体、利用者固有 path、認証情報、実 lockfile を fixture としてコミットしない。
 
 ## テスト層
 
-### 1. Unit test
+### Unit test
 
-manifest、receipt、path、status、引数生成など、processや実HOMEを必要としない規則を検証する。
-境界値と拒否すべき入力を table-driven test で表す。
+filesystem discovery を一時ディレクトリに対して検証する。N01 で決めた通常 entry、空 directory、
+対象なし、読み取り不能、symlink、壊れた entry、決定的な並び順を、必要な範囲だけ table-driven test に
+する。
 
-### 2. Component test
+### CLI test
 
-外部 `skills` CLI は fake executable または `Runner` で置き換える。呼び出し回数よりも、shell を
-介さない引数、失敗時の停止位置、再観測の順序を確認する。
+process を起動し、argument、終了 status、stdout、stderr が承認済み契約と一致することを確認する。
+実 HOME ではなく、テストが所有する root を使える内部境界を設ける。利用者向けに未承認の flag や
+環境変数を公開してテスト注入を実現しない。
 
-### 3. Container integration test
+### Package smoke test
 
-合成した Skill/manifest と protocol を再現する fake CLI を使い、隔離 HOME 内で install、再実行、
-reconfigure、prune、adopt をネットワーク非依存で検証する。固定済みの実 `skills` CLI は、local fixture
-で再現できる範囲と `--version`、一覧形式のcontract確認に使う。公開 remote へのアクセスは必須 CI に
-しない。機能がまだ未移行なら、そのシナリオは追加しない。
+Go build、Nix package、コンテナから同じ CLI を起動し、読み取り専用の合成 fixture に対して結果が
+一致することを確認する。
 
-### 4. Read-only shadow test
+### 実環境での確認
 
-切り替え直前に限り、利用者が明示的に選んだ実workspaceに対して新しい `doctor` と `plan` を
-読み取り専用で実行し、承認済みcontractと照合する。inventory側の出力を期待値にしない。
-エージェントが実環境で `apply` や `--prune` を自動実行しない。
+N01 と実装が承認された後に限り、利用者が明示的に実行した一覧 command で実 `.agents/skills` を
+読み取れる。自動テスト、CI、エージェントによる検証では実 HOME を走査しない。
 
-## GitHub Actions
+## symlink と path
 
-既存の `00-security-scan.yaml`、`00-semantic-pr-check.yaml`、
-`00-weekly-merged-prs-report.yaml`、`00-entire-checkpoint-collection.yaml` はそのまま維持し、ツール用の
-workflow を独立して追加する。最初は次の job に分ける。既存 workflow の変更が必要になった場合は、
-機能移行と混ぜずに独立した CI PR とする。
+symlink を一覧へ含めるか、どこまで解決するか、壊れた symlink をどう報告するかは N01 で決める。
+決定前に実装の偶然の挙動へ依存しない。
 
-| Job         | 役割                                             | 必須条件                         |
-| ----------- | ------------------------------------------------ | -------------------------------- |
-| nix-package | flake check、package build、app smoke            | `flake.lock` とNix sandboxを使う |
-| build-unit  | Go format、static check、unit test、build        | `go.mod` のtoolchainを使う       |
-| integration | 現在までに公開したシナリオだけを隔離 root で実行 | 実 secret とhost stateを使わない |
+どの契約を選んでも、一覧表示のために root 外へ書き込まない。path を出力する場合は、利用者向けの
+表示とテスト・ログでの絶対 path 露出を分けて検討する。
 
-このworkflowには独自のdiff parserやcontent scannerを設けない。500行制限と禁止対象は、ロードマップ
-進行時にmerge baseからの最終差分を監査し、PRレビューで確認する。機密情報の機械的な検出は既存の
-`00-security-scan.yaml`に委ね、端末固有pathなど文脈依存の対象はリポジトリ指示と差分監査で扱う。
-これらをcandidate branch自身による改変耐性のあるpolicy enforcementとは位置づけない。
+## 将来のコピー機能
 
-推奨する基本検査は `gofmt` 差分なし、`go vet ./...`、`go test ./...`、必要な段階から
-`go test -race ./...` である。workflow 自体は `actionlint` と既存の pin 管理対象に含める。
+コピー機能は、一覧表示や TUI と同じ安全契約にしない。destination 構造と衝突規則が決まった後に、
+次の安全条件を具体化する。
 
-PR の `pull_request` workflow は `contents: read` を基本とし、PR から package 公開、release 作成、
-manifest 書き換えを行わない。配布が必要になる F03 は、テスト workflow と分け、承認された tag
-または手動 trigger だけを入口にする。
+- dry-run または同等の事前確認
+- destination containment
+- symlink と特殊ファイルの扱い
+- staging と原子的な確定
+- 既存 destination の保護
+- 部分失敗と再実行
 
-## 500 行制限の確認
+ライセンス適合性をツールが判定しないことと、意図しない path をコピーしないことは別の責務である。
 
-集計は PR の merge base と head の diff に対して行い、次の内訳を PR 本文へ表示する。
+## 基本検証
 
-| 区分           | 例                                         | 判定                                     |
-| -------------- | ------------------------------------------ | ---------------------------------------- |
-| 手書き実装     | 非 test Go、workflow、script、実行設定     | 追加＋削除 500 行以下を必須とする        |
-| テスト         | `*_test.go`、テスト用 helper・fake         | 別集計し、実装と同じ PR に含める         |
-| 手書き fixture | `testdata`、合成 manifest・Skill           | 別集計し、テストと同じ PR に含める       |
-| 生成物         | npm/Nix lockfile、再生成可能なsource・設定 | 明示したpathだけを別集計する             |
-| 文書           | `docs/**`、明示した README など            | 別集計する                               |
-| 純粋な rename  | 内容を変更しない path 移動                 | 別集計し、変更された行だけを実装へ数える |
+現在利用可能な経路について、少なくとも次を実行する。
 
-手書き総差分は、手書き実装、テスト、手書き fixture の合計とする。これが 1,000 行を超えた場合、
-自動判定に委ねず作業を停止して分割要否をレビューする。レビューでは、テストが一つの振る舞いを
-検証するための反復的なcaseなのか、新しいテスト基盤や複数の仕様を含むのかを確認し、後者なら分割する。
+- `gofmt` の差分がないこと
+- `go vet ./...`
+- `go test ./...`
+- `nix flake check`
+- `nix build .#skills-reconcile`
+- コンテナ build と、合成 HOME に対する smoke test
 
-生成物を別集計できるのは、生成元が同じ PR にあり、固定した手順で再生成でき、CI で差分なしを
-確認できる場合だけとする。それ以外の生成 source・設定は手書き実装として数える。`package.json` と
-`package-lock.json`、`flake.nix` と `flake.lock` のように原子的であるべき組み合わせは分離せず、
-同じ PR に含める。
+Nix やコンテナを N04、N05 で変更する場合も、変更前後で利用可能な検証経路を明示し、壊れた状態を
+次の PR に持ち越さない。
 
-集計が 500 行以下でも、一つの振る舞いとしてレビューしにくい場合はさらに分ける。一方、実装と
-対応テストを別 PR にしたり、テスト量だけを理由に一つの振る舞いを分割したりしない。
+## 停止条件
 
-## 禁止対象の確認
+次の場合は実装または merge を止め、契約または PR 境界を見直す。
 
-最終差分で少なくとも次を確認し、該当する場合は停止する。
-
-- ルートの `skills/**`
-- ルートの実運用用 `skills-manifest.json`
-- `state/**`、`.skill-lock.json`、`workspace-projections.json`
-- `node_modules/**`、ビルド済み `skills-reconcile`
-- private key、token、認証情報を含む URL、利用者の絶対パス
-
-テスト fixture のファイル名が状態ファイルと同じになる場合は、`testdata` の下に合成データである
-ことを明示し、secret scan も通す。
-
-## 1 PR ごとの協業フロー
-
-1. ロードマップから次の一項目だけを選ぶ。
-2. 実装前に、入力、期待する出力、副作用、未対応範囲を短い作業メモとして整理する。
-3. 承認済みの製品契約と、利用する外部dependencyの公開境界を列挙する。利用者向けcommandでは、
-   対応する[CLI契約](cli-contract.md)のentryが先行PRで承認済みであることも確認する。openなstack
-   layerの場合は、現在headへのmaintainer明示承認と、依存PR本文に記録する証跡を確認する。
-4. 合成 fixture と失敗系テストを先に用意し、コンテナで対象範囲だけを反復する。
-5. 対象の振る舞いを移し、全テストを実行して、差分内訳、500行制限、禁止対象を確認する。
-6. 必須のローカル検証がすべて成功し、未解決の仕様判断がない場合だけ承認されたregularまたは
-   stacked PR workflowでPRを作成する。
-7. PR 本文で、作業メモの契約、差分、実測行数、検証結果、意図的な未対応範囲を一緒に確認する。
-8. CI とレビューが完了してから人が squash merge し、ロードマップへ実測と引き継ぎを反映する。
-9. `main` の成功を確認してから次の機能に着手する。
-
-この流れにより、仕様判断が必要な箇所を実装前または小さな差分の段階で相談できる。承認済み契約と
-外部dependencyの公開動作が両立しない場合は、PR作成前ならcommit、push、PR作成を行わず、
-[対象範囲と互換性](scope-and-compatibility.md)の判断情報を提示する。PR作成後のCIまたはレビューで
-見つかった場合は、PRをopenのまま残してmergeせず、同じ情報を提示する。指示があるまで当該機能の
-公開を進めない。
-
-## PR の停止条件
-
-次のいずれかに当たる場合はマージせず、分割または相談する。
-
-- 手書きによる非テスト実装の差分が 500 行を超えた。
-- 実装と対応テストが別 PR になっている。
-- 手書き総差分が 1,000 行を超え、分割要否をレビューしていない。
-- 既存機能の仕様変更が、対象機能の移行に混ざった。
-- 実 HOME、実 Skill、実 manifest、認証情報がテストに必要になった。
-- 承認済みの製品契約と固定dependencyの公開動作を同時に満たせない。
-- 削除対象または workspace 所有権を、観測状態から一意に証明できない。
-- regular PRで前のPRが未merge、またはexplicitなstackのrootが最新の成功した`main`に基づかない。
-- explicitなstackで、対象項目の直接のbaseが先行項目のbranchでない、または各layerを直接のbaseに
-  対してbuild・testできない。
-- 利用者向けcommandの実装または変更に、先に承認された完全なCLI契約entryがない。openな契約PRでは、
-  maintainerが現在のhead commitを明示承認していない、または依存PR本文に承認証跡がない場合も含む。
-- コンテナと CI で結果が一致しない。
-
-## 切り替え手順
-
-1. F01 までの合成環境テストをすべて成功させる。
-2. コマンド、flag、status、出力形式のcontract表を完成させる。
-3. 合成したmanifest、公開CLI観測、receipt snapshotに対して読み取り専用で実行する。
-4. contract表の未実装または未判断項目をゼロにする。
-5. 実 workspace では `doctor`、次に `plan` だけを実行し、結果を人が承認する。
-6. 独立した F03 PR で build・配布・利用文書を確定する。
-7. 新実装による最初の書き込み操作は prune なしで行い、再度 `plan` して収束を確認する。
-8. `--prune` は別の明示作業として扱い、削除対象をレビューしてから実行する。
-
-## ロールバック
-
-- 機能移行中は、問題のある最新 PR を revert し、直前の `main` へ戻す。
-- `.worktrees/skills` はF03完了まで変更せず、切り替え失敗時のrollback参照としてだけ保持する。
-- 移行先を配布してもrollback経路を即座に削除しない。少なくとも最初のinstallと再planが収束する
-  までは固定したrollback参照を保持する。
-- 外部installが一部成功した場合は、無条件の逆操作をしない。intent、公開CLI観測、receipt、tree
-  fingerprintを保存し、所有権を確認してから再実行または手動復旧を選ぶ。
-- prune後の自動復元は計画しない。削除前レビューと確定済みreceiptを復旧判断の根拠にする。
+- 一覧表示の仕様を実装者が推測する必要がある。
+- 実 HOME や実 Skill がテストに必要になる。
+- 読み取り機能がファイルを変更する。
+- TUI、コピー、作者区分、manifest など未決の責務が最初の実装へ混ざる。
+- symlink や読み取り不能 entry の扱いが契約とテストで一致しない。
+- 手書き非テスト実装が 500 行を超える。
+- 実装、テスト、fixture の手書き総差分が 1,000 行を超え、責務の再確認をしていない。
+- Go、Nix、コンテナの現在有効な経路が同じ公開済み挙動を提供しない。
