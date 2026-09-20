@@ -39,21 +39,26 @@
 #### Skill の認識
 
 - scan root の直下だけを走査し、再帰的に探索しない。
-- root 直下の entry が directory であり、その直下に symlink ではない通常ファイルの `SKILL.md` が
-  存在する場合、その entry を一つの Skill と認識する。
-- `SKILL.md` の内容、frontmatter、名前、空かどうかは検証しない。空の `SKILL.md` も認識条件を満たす。
+- root 直下の entry 名は 1 文字以上 64 文字以下とし、ASCII 小文字 `a-z`、数字 `0-9`、
+  hyphen `-` だけを認める。hyphen は先頭と末尾に置かず、連続させない。
+- この名前条件を満たさない entry は Skill として扱わず、entry の種類、symlink target、
+  `SKILL.md` の状態を調べる前に認識対象から外す。その entry の状態は一覧処理を失敗させない。
+- 名前条件を満たす root 直下の entry が directory であり、その直下に symlink ではない
+  通常ファイルの `SKILL.md` が存在する場合、その entry を一つの Skill と認識する。
+- `SKILL.md` の内容、frontmatter 内の `name`、空かどうかは検証しない。空の `SKILL.md` も認識条件を満たす。
 - 通常ファイル、特殊ファイル、directory 以外を指す symlink は Skill として扱わない。
 - `SKILL.md` が存在しない directory、または `SKILL.md` が通常ファイルではない directory は Skill として
   扱わない。
 
 #### Symlink と異常 entry
 
-- root 直下の symlink が directory を指し、その directory が Skill の認識条件を満たす場合は Skill として
-  扱う。一覧には symlink target の名前ではなく、root 直下の entry 名を使用する。
+- root 直下の名前条件を満たす symlink が directory を指し、その directory が Skill の認識条件を
+  満たす場合は Skill として扱う。名前条件と一覧表示には symlink target の名前ではなく、root 直下の
+  entry 名を使用する。
 - root 直下の symlink target が scan root 外にあっても、一覧のための読み取りに限って認識対象にする。
   この決定は、将来のコピー処理で scan root 外の target を許可する根拠にしない。
-- root 直下の壊れた symlink、symlink loop、entry の種類または `SKILL.md` の状態を確認できない読み取り
-  error が一つでもある場合は、一覧処理全体を失敗させる。
+- root 直下の名前条件を満たす entry に、壊れた symlink、symlink loop、entry の種類または
+  `SKILL.md` の状態を確認できない読み取り error が一つでもある場合は、一覧処理全体を失敗させる。
 - discovery が失敗した場合は、確認済みの Skill を部分結果として stdout に出力しない。
 
 #### 成功時の出力
