@@ -18,6 +18,10 @@ func SkillNames(scanRootPath string) ([]string, error) {
 
 	var skillNames []string
 	for _, entry := range entries {
+		if !isSkillName(entry.Name()) {
+			continue
+		}
+
 		entryPath := filepath.Join(scanRootPath, entry.Name())
 		entryInfo, err := os.Stat(entryPath)
 		if err != nil {
@@ -41,4 +45,24 @@ func SkillNames(scanRootPath string) ([]string, error) {
 
 	sort.Strings(skillNames)
 	return skillNames, nil
+}
+
+func isSkillName(name string) bool {
+	if len(name) == 0 || len(name) > 64 || name[0] == '-' || name[len(name)-1] == '-' {
+		return false
+	}
+
+	previousHyphen := false
+	for index := 0; index < len(name); index++ {
+		character := name[index]
+		switch {
+		case character >= 'a' && character <= 'z', character >= '0' && character <= '9':
+			previousHyphen = false
+		case character == '-' && !previousHyphen:
+			previousHyphen = true
+		default:
+			return false
+		}
+	}
+	return true
 }
