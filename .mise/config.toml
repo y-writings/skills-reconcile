@@ -7,4 +7,4 @@ run = "docker build --target runtime --tag skills-reconcile:local ."
 
 [tasks."container:test"]
 description = "Build and smoke-test the CLI runtime image"
-run = "sh scripts/container-test.sh"
+file = "scripts/container-test.sh"
