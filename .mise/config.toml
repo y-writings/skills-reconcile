@@ -47,6 +47,8 @@ mkdir -p \
   "$smoke_home/external-tree/restricted/blocked-skill" \
   "$smoke_home/relative-root-agents" \
   "$smoke_home/relative-root-target/root-skill" \
+  "$smoke_home/relative-entry-agents/skills" \
+  "$smoke_home/relative-entry-target/relative-skill" \
   "$smoke_home/unreadable-agents/skills/a-valid" \
   "$smoke_home/unreadable-agents/skills/z-locked" \
   "$smoke_home/missing-agents" \
@@ -57,6 +59,7 @@ touch "$external_skill/SKILL.md"
 touch "$smoke_home/group-agents/skills/group-skill/SKILL.md"
 touch "$smoke_home/external-tree/restricted/blocked-skill/SKILL.md"
 touch "$smoke_home/relative-root-target/root-skill/SKILL.md"
+touch "$smoke_home/relative-entry-target/relative-skill/SKILL.md"
 touch "$smoke_home/unreadable-agents/skills/a-valid/SKILL.md"
 touch "$smoke_home/unreadable-agents/skills/z-locked/SKILL.md"
 ln -s "$external_skill" "$smoke_home/.agents/skills/linked-skill"
@@ -64,6 +67,8 @@ ln -s \
   "$smoke_home/external-tree/restricted/blocked-skill" \
   "$smoke_home/ancestor-agents/skills/blocked-skill"
 ln -s '../relative-root-target' "$smoke_home/relative-root-agents/skills"
+ln -s '../../relative-entry-target/relative-skill' \
+  "$smoke_home/relative-entry-agents/skills/relative-linked-skill"
 chmod 000 "$smoke_home/unreadable-agents/skills/z-locked"
 chmod 000 "$smoke_home/external-tree/restricted"
 if test -n "$supplementary_gid" && test "$(uname -s)" = 'Linux'; then
@@ -100,6 +105,20 @@ relative_root_actual="$(docker run --rm --read-only \
 if test "$relative_root_actual" != 'root-skill'; then
   printf 'unexpected relative scan root output: %s\n' \
     "$relative_root_actual" >&2
+  exit 1
+fi
+
+relative_entry_actual="$(docker run --rm --read-only \
+  "$@" \
+  --env HOME=/home/skills \
+  --mount \
+    "type=bind,src=$smoke_home/relative-entry-agents,dst=/home/skills/.agents,readonly" \
+  --mount \
+    "type=bind,src=$smoke_home/relative-entry-target,dst=/home/skills/relative-entry-target,readonly" \
+  skills-reconcile:local list)"
+if test "$relative_entry_actual" != 'relative-linked-skill'; then
+  printf 'unexpected relative Skill entry output: %s\n' \
+    "$relative_entry_actual" >&2
   exit 1
 fi
 

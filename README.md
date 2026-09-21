@@ -85,11 +85,12 @@ docker run --rm --read-only "$@" \
 
 This minimal mount covers directories and relative symlinks whose targets
 resolve inside the mounted `.agents` directory. Absolute symlinks and symlinks
-to directories outside `.agents` require an additional read-only mount at the
-same absolute path inside the container. Mount a containing tree rather than
-only the target directory so the container sees the target's host-side ancestor
-permissions. For example, for `/absolute/path/to/external-skill`, mount
-`/absolute` at `/absolute`:
+to directories outside `.agents` require an additional read-only mount that
+maps a containing tree to its resolved location inside the container. Mount a
+containing tree rather than only the target directory so the container sees the
+target's host-side ancestor permissions. For an absolute symlink, the host
+source and container destination are the same. For example, for
+`/absolute/path/to/external-skill`, mount `/absolute` at `/absolute`:
 
 ```sh
 primary_gid="$(id -g)"
@@ -118,10 +119,14 @@ Choose the narrowest containing tree that includes every host-side ancestor
 whose traversal permissions need to be preserved, and repeat the additional
 mount for every non-overlapping external tree. Mounting only the target lets a
 rootful daemon bypass a denied host ancestor and replace it with a traversable
-container-side directory. Set `dst` to the same absolute path as the selected
-source tree. Resolve a relative scan-root link `.agents/skills` from
-`/home/skills/.agents`; resolve a relative Skill entry inside that root from
-`/home/skills/.agents/skills` before selecting the containing tree.
+container-side directory. For a relative symlink, resolve the source tree from
+the host link parent and the destination tree from its container link parent;
+the two paths differ when `HOME` is relocated to `/home/skills`. Resolve a
+scan-root link `.agents/skills` from `$agents_dir` on the host and
+`/home/skills/.agents` in the container. Resolve a Skill entry from
+`$agents_dir/skills` on the host and `/home/skills/.agents/skills` in the
+container. Set `src` to the selected host tree and `dst` to its corresponding
+container tree.
 
 The command exits with status `0` on success. Invalid arguments, an invalid
 `HOME`, an unavailable scan root, or an unreadable recognized entry produce a
