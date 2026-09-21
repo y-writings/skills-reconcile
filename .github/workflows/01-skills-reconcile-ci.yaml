@@ -19,9 +19,24 @@ jobs:
           test -z "$unformatted"
           go test ./...
           go vet ./...
-          go build ./...
-      - name: Smoke test the CLI
-        run: go run ./cmd/skills-reconcile --help >/dev/null
+          go build -trimpath -o "$RUNNER_TEMP/skills-reconcile" ./cmd/skills-reconcile
+      - name: Smoke test the Go CLI
+        run: |
+          smoke_home="$RUNNER_TEMP/go-smoke-home"
+          mkdir -p \
+            "$smoke_home/.agents/skills/alpha" \
+            "$smoke_home/.agents/skills/zed"
+          touch \
+            "$smoke_home/.agents/skills/alpha/SKILL.md" \
+            "$smoke_home/.agents/skills/zed/SKILL.md"
+          chmod -R a-w "$smoke_home"
+
+          expected="$(printf 'alpha\nzed\n')"
+          actual="$(HOME="$smoke_home" "$RUNNER_TEMP/skills-reconcile" list)"
+          if test "$actual" != "$expected"; then
+            printf 'unexpected Go CLI output: %s\n' "$actual" >&2
+            exit 1
+          fi
   nix-package:
     runs-on: ubuntu-24.04
     steps:
@@ -31,9 +46,37 @@ jobs:
         run: |
           nix flake check --all-systems
           nix build .#skills-reconcile
-          ./result/bin/skills-reconcile --help >/dev/null
-          nix run .#skills-reconcile -- --help >/dev/null
-          nix run .#default -- --help >/dev/null
+      - name: Smoke test the Nix package and apps
+        run: |
+          smoke_home="$RUNNER_TEMP/nix-smoke-home"
+          mkdir -p \
+            "$smoke_home/.agents/skills/alpha" \
+            "$smoke_home/.agents/skills/zed"
+          touch \
+            "$smoke_home/.agents/skills/alpha/SKILL.md" \
+            "$smoke_home/.agents/skills/zed/SKILL.md"
+          chmod -R a-w "$smoke_home"
+
+          expected="$(printf 'alpha\nzed\n')"
+          export HOME="$smoke_home"
+          export XDG_CACHE_HOME="$RUNNER_TEMP/nix-xdg/cache"
+          export XDG_CONFIG_HOME="$RUNNER_TEMP/nix-xdg/config"
+          export XDG_STATE_HOME="$RUNNER_TEMP/nix-xdg/state"
+          mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME"
+
+          assert_list_output() {
+            label="$1"
+            shift
+            actual="$("$@" list)"
+            if test "$actual" != "$expected"; then
+              printf 'unexpected %s output: %s\n' "$label" "$actual" >&2
+              exit 1
+            fi
+          }
+
+          assert_list_output "Nix package" ./result/bin/skills-reconcile
+          assert_list_output "named Nix app" nix run .#skills-reconcile --
+          assert_list_output "default Nix app" nix run .#default --
   integration:
     runs-on: ubuntu-24.04
     steps:
