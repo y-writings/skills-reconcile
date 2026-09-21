@@ -13,7 +13,8 @@ set -eu
 docker build --target runtime --tag skills-reconcile:local .
 
 smoke_home="$(mktemp -d)"
-external_skill="$(mktemp -d)"
+external_tree="$(mktemp -d)"
+external_skill="$external_tree/external-skill"
 container_uid="$(id -u)"
 container_gid="$(id -g)"
 container_user="$container_uid:$container_gid"
@@ -33,29 +34,38 @@ cleanup() {
   chmod -R u+rwx "$smoke_home/group-agents" 2>/dev/null || true
   chmod u+rwx "$smoke_home/unreadable-agents/skills/z-locked" \
     2>/dev/null || true
-  chmod -R u+w "$smoke_home" "$external_skill"
-  rm -rf "$smoke_home" "$external_skill"
+  chmod u+rwx "$smoke_home/external-tree/restricted" 2>/dev/null || true
+  chmod -R u+w "$smoke_home" "$external_tree"
+  rm -rf "$smoke_home" "$external_tree"
 }
 trap cleanup EXIT
 mkdir -p \
   "$smoke_home/.agents/skills/alpha" \
   "$smoke_home/.agents/skills/zed" \
   "$smoke_home/group-agents/skills/group-skill" \
+  "$smoke_home/ancestor-agents/skills" \
+  "$smoke_home/external-tree/restricted/blocked-skill" \
   "$smoke_home/relative-root-agents" \
   "$smoke_home/relative-root-target/root-skill" \
   "$smoke_home/unreadable-agents/skills/a-valid" \
   "$smoke_home/unreadable-agents/skills/z-locked" \
-  "$smoke_home/missing-agents"
+  "$smoke_home/missing-agents" \
+  "$external_skill"
 touch "$smoke_home/.agents/skills/alpha/SKILL.md"
 touch "$smoke_home/.agents/skills/zed/SKILL.md"
 touch "$external_skill/SKILL.md"
 touch "$smoke_home/group-agents/skills/group-skill/SKILL.md"
+touch "$smoke_home/external-tree/restricted/blocked-skill/SKILL.md"
 touch "$smoke_home/relative-root-target/root-skill/SKILL.md"
 touch "$smoke_home/unreadable-agents/skills/a-valid/SKILL.md"
 touch "$smoke_home/unreadable-agents/skills/z-locked/SKILL.md"
 ln -s "$external_skill" "$smoke_home/.agents/skills/linked-skill"
+ln -s \
+  "$smoke_home/external-tree/restricted/blocked-skill" \
+  "$smoke_home/ancestor-agents/skills/blocked-skill"
 ln -s '../relative-root-target' "$smoke_home/relative-root-agents/skills"
 chmod 000 "$smoke_home/unreadable-agents/skills/z-locked"
+chmod 000 "$smoke_home/external-tree/restricted"
 if test -n "$supplementary_gid" && test "$(uname -s)" = 'Linux'; then
   group_probe_enabled=1
   chgrp -R "$supplementary_gid" "$smoke_home/group-agents"
@@ -72,7 +82,7 @@ actual="$(docker run --rm --read-only \
   --mount \
     "type=bind,src=$smoke_home/.agents,dst=/home/skills/.agents,readonly" \
   --mount \
-    "type=bind,src=$external_skill,dst=$external_skill,readonly" \
+    "type=bind,src=$external_tree,dst=$external_tree,readonly" \
   skills-reconcile:local list)"
 if test "$actual" != "$expected"; then
   printf 'unexpected container CLI output: %s\n' "$actual" >&2
@@ -111,6 +121,27 @@ if test "$group_probe_enabled" -eq 1; then
   if test "$group_actual" != 'group-skill'; then
     printf 'unexpected supplementary group output: %s\n' \
       "$group_actual" >&2
+    exit 1
+  fi
+fi
+
+if test "$container_uid" -ne 0 && test "$(uname -s)" = 'Linux'; then
+  set +e
+  ancestor_stdout="$(docker run --rm --read-only \
+    "$@" \
+    --env HOME=/home/skills \
+    --mount \
+      "type=bind,src=$smoke_home/ancestor-agents,dst=/home/skills/.agents,readonly" \
+    --mount \
+      "type=bind,src=$smoke_home/external-tree,dst=$smoke_home/external-tree,readonly" \
+    skills-reconcile:local list 2>"$smoke_home/ancestor-stderr")"
+  ancestor_exit_code=$?
+  set -e
+  if test "$ancestor_exit_code" -ne 1 \
+    || test -n "$ancestor_stdout" \
+    || test ! -s "$smoke_home/ancestor-stderr"; then
+    printf 'unexpected external ancestor result: status=%s stdout=%s\n' \
+      "$ancestor_exit_code" "$ancestor_stdout" >&2
     exit 1
   fi
 fi

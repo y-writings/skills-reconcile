@@ -86,8 +86,10 @@ docker run --rm --read-only "$@" \
 This minimal mount covers directories and relative symlinks whose targets
 resolve inside the mounted `.agents` directory. Absolute symlinks and symlinks
 to directories outside `.agents` require an additional read-only mount at the
-path where each target resolves inside the container. For an absolute symlink,
-mount the target at the same absolute path:
+same absolute path inside the container. Mount a containing tree rather than
+only the target directory so the container sees the target's host-side ancestor
+permissions. For example, for `/absolute/path/to/external-skill`, mount
+`/absolute` at `/absolute`:
 
 ```sh
 primary_gid="$(id -g)"
@@ -102,21 +104,24 @@ if ! test -d "$agents_dir"; then
   agents_dir="$(mktemp -d)"
   trap 'rmdir "$agents_dir"' EXIT
 fi
-external_skill="/absolute/path/to/external-skill"
+external_tree="/absolute"
 docker run --rm --read-only "$@" \
   --env HOME=/home/skills \
   --mount \
     type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
   --mount \
-    type=bind,src="$external_skill",dst="$external_skill",readonly \
+    type=bind,src="$external_tree",dst="$external_tree",readonly \
   skills-reconcile:local list
 ```
 
-Repeat the additional mount for every external target. Set `dst` to the target
-path after resolving a relative symlink from its actual parent in the
-container. Resolve the scan-root link `.agents/skills` from
-`/home/skills/.agents`; resolve a Skill entry inside that root from
-`/home/skills/.agents/skills`.
+Choose the narrowest containing tree that includes every host-side ancestor
+whose traversal permissions need to be preserved, and repeat the additional
+mount for every non-overlapping external tree. Mounting only the target lets a
+rootful daemon bypass a denied host ancestor and replace it with a traversable
+container-side directory. Set `dst` to the same absolute path as the selected
+source tree. Resolve a relative scan-root link `.agents/skills` from
+`/home/skills/.agents`; resolve a relative Skill entry inside that root from
+`/home/skills/.agents/skills` before selecting the containing tree.
 
 The command exits with status `0` on success. Invalid arguments, an invalid
 `HOME`, an unavailable scan root, or an unreadable recognized entry produce a
