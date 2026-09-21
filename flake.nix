@@ -23,44 +23,6 @@
       packages = forEachSystem (
         _system: pkgs:
         let
-          nodejs = pkgs.nodejs_22;
-
-          skillsCli =
-            assert pkgs.lib.assertMsg (pkgs.lib.versionAtLeast nodejs.version "22.20.0")
-              "skills 1.5.23 requires Node.js 22.20.0 or newer";
-            pkgs.buildNpmPackage {
-              pname = "skills-cli";
-              version = "1.5.23";
-
-              src = ./tools/skills;
-              inherit nodejs;
-
-              npmDeps = pkgs.importNpmLock { npmRoot = ./tools/skills; };
-              npmConfigHook = pkgs.importNpmLock.npmConfigHook;
-              npmFlags = [ "--ignore-scripts" ];
-              dontNpmBuild = true;
-
-              nativeBuildInputs = [ pkgs.makeWrapper ];
-
-              installPhase = ''
-                runHook preInstall
-
-                mkdir -p $out/bin $out/lib/skills-cli
-                cp -R node_modules $out/lib/skills-cli/
-                makeWrapper ${nodejs}/bin/node $out/bin/skills \
-                  --add-flags $out/lib/skills-cli/node_modules/skills/bin/cli.mjs
-
-                runHook postInstall
-              '';
-
-              meta = {
-                description = "Pinned skills CLI used by skills-reconcile";
-                homepage = "https://github.com/vercel-labs/skills";
-                license = pkgs.lib.licenses.mit;
-                mainProgram = "skills";
-              };
-            };
-
           skillsReconcile = pkgs.buildGoModule {
             pname = "skills-reconcile";
             version = "0.0.0";
@@ -82,17 +44,10 @@
 
             vendorHash = null;
 
-            nativeBuildInputs = [ pkgs.makeWrapper ];
-
             checkPhase = ''
               runHook preCheck
               go test ./...
               runHook postCheck
-            '';
-
-            postFixup = ''
-              wrapProgram $out/bin/skills-reconcile \
-                --set SKILLS_RECONCILE_EXECUTABLE ${skillsCli}/bin/skills
             '';
 
             doInstallCheck = true;
@@ -100,14 +55,6 @@
               runHook preInstallCheck
 
               $out/bin/skills-reconcile --help >/dev/null
-              skills_version="$(${skillsCli}/bin/skills --version)"
-              case "$skills_version" in
-                1.5.23|"skills 1.5.23"|v1.5.23) ;;
-                *)
-                  echo "unexpected skills version: $skills_version" >&2
-                  exit 1
-                  ;;
-              esac
 
               runHook postInstallCheck
             '';
@@ -118,7 +65,7 @@
             ];
 
             meta = {
-              description = "Reconcile portable Skill manifests with installed Skills";
+              description = "List Skills in .agents/skills";
               homepage = "https://github.com/y-writings/skills-reconcile";
               license = pkgs.lib.licenses.mit;
               mainProgram = "skills-reconcile";
