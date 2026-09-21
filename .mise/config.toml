@@ -14,22 +14,36 @@ docker build --target runtime --tag skills-reconcile:local .
 
 smoke_home="$(mktemp -d)"
 external_skill="$(mktemp -d)"
-trap 'chmod -R u+w "$smoke_home" "$external_skill"; rm -rf "$smoke_home" "$external_skill"' EXIT
+container_uid="$(id -u)"
+container_user="$container_uid:$(id -g)"
+cleanup() {
+  chmod u+rwx "$smoke_home/unreadable-agents/skills/z-locked" \
+    2>/dev/null || true
+  chmod -R u+w "$smoke_home" "$external_skill"
+  rm -rf "$smoke_home" "$external_skill"
+}
+trap cleanup EXIT
 mkdir -p \
   "$smoke_home/.agents/skills/alpha" \
   "$smoke_home/.agents/skills/zed" \
   "$smoke_home/relative-root-agents" \
   "$smoke_home/relative-root-target/root-skill" \
+  "$smoke_home/unreadable-agents/skills/a-valid" \
+  "$smoke_home/unreadable-agents/skills/z-locked" \
   "$smoke_home/missing-agents"
 touch "$smoke_home/.agents/skills/alpha/SKILL.md"
 touch "$smoke_home/.agents/skills/zed/SKILL.md"
 touch "$external_skill/SKILL.md"
 touch "$smoke_home/relative-root-target/root-skill/SKILL.md"
+touch "$smoke_home/unreadable-agents/skills/a-valid/SKILL.md"
+touch "$smoke_home/unreadable-agents/skills/z-locked/SKILL.md"
 ln -s "$external_skill" "$smoke_home/.agents/skills/linked-skill"
 ln -s '../relative-root-target' "$smoke_home/relative-root-agents/skills"
+chmod 000 "$smoke_home/unreadable-agents/skills/z-locked"
 
 expected="$(printf 'alpha\nlinked-skill\nzed\n')"
 actual="$(docker run --rm --read-only \
+  --user "$container_user" \
   --env HOME=/home/skills \
   --mount \
     "type=bind,src=$smoke_home/.agents,dst=/home/skills/.agents,readonly" \
@@ -42,6 +56,7 @@ if test "$actual" != "$expected"; then
 fi
 
 relative_root_actual="$(docker run --rm --read-only \
+  --user "$container_user" \
   --env HOME=/home/skills \
   --mount \
     "type=bind,src=$smoke_home/relative-root-agents,dst=/home/skills/.agents,readonly" \
@@ -56,6 +71,7 @@ fi
 
 set +e
 missing_stdout="$(docker run --rm --read-only \
+  --user "$container_user" \
   --env HOME=/home/skills \
   --mount \
     "type=bind,src=$smoke_home/missing-agents,dst=/home/skills/.agents,readonly" \
@@ -68,5 +84,23 @@ if test "$missing_exit_code" -ne 1 \
   printf 'unexpected missing scan root result: status=%s stdout=%s\n' \
     "$missing_exit_code" "$missing_stdout" >&2
   exit 1
+fi
+if test "$container_uid" -ne 0; then
+  set +e
+  unreadable_stdout="$(docker run --rm --read-only \
+    --user "$container_user" \
+    --env HOME=/home/skills \
+    --mount \
+      "type=bind,src=$smoke_home/unreadable-agents,dst=/home/skills/.agents,readonly" \
+    skills-reconcile:local list 2>"$smoke_home/unreadable-stderr")"
+  unreadable_exit_code=$?
+  set -e
+  if test "$unreadable_exit_code" -ne 1 \
+    || test -n "$unreadable_stdout" \
+    || test ! -s "$smoke_home/unreadable-stderr"; then
+    printf 'unexpected unreadable Skill result: status=%s stdout=%s\n' \
+      "$unreadable_exit_code" "$unreadable_stdout" >&2
+    exit 1
+  fi
 fi
 '''

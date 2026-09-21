@@ -57,7 +57,10 @@ docker build --target runtime --tag skills-reconcile:local .
 Mount the `.agents` parent into a synthetic home. If the host parent is absent,
 use an empty temporary directory so the CLI can report the missing scan root
 instead of Docker rejecting a nonexistent bind source. The read-only container
-filesystem and bind mount preserve the CLI's no-write boundary:
+filesystem and bind mount preserve the CLI's no-write boundary. For a non-root
+user on a rootful Docker daemon, pass the invoking user's numeric UID and
+primary GID so the CLI does not default to root and bypass DAC checks.
+Supplementary groups and user-namespace mappings remain daemon-specific:
 
 ```sh
 agents_dir="$HOME/.agents"
@@ -66,6 +69,7 @@ if ! test -d "$agents_dir"; then
   trap 'rmdir "$agents_dir"' EXIT
 fi
 docker run --rm --read-only \
+  --user "$(id -u):$(id -g)" \
   --env HOME=/home/skills \
   --mount \
     type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
@@ -86,6 +90,7 @@ if ! test -d "$agents_dir"; then
 fi
 external_skill="/absolute/path/to/external-skill"
 docker run --rm --read-only \
+  --user "$(id -u):$(id -g)" \
   --env HOME=/home/skills \
   --mount \
     type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
