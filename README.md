@@ -79,9 +79,12 @@ fi
 docker run --rm --read-only "$@" \
   --env HOME=/home/skills \
   --mount \
-    type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
+    "type=bind,\"src=$agents_dir\",dst=/home/skills/.agents,readonly" \
   skills-reconcile:local list
 ```
+
+The inner quotes use Docker's CSV-style `--mount` syntax so a comma in the
+host path remains part of `src` instead of becoming an option separator.
 
 This minimal mount covers directories and relative symlinks whose targets
 resolve inside the mounted `.agents` directory. Absolute symlinks and symlinks
@@ -109,9 +112,9 @@ external_tree="/absolute"
 docker run --rm --read-only "$@" \
   --env HOME=/home/skills \
   --mount \
-    type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
+    "type=bind,\"src=$agents_dir\",dst=/home/skills/.agents,readonly" \
   --mount \
-    type=bind,src="$external_tree",dst="$external_tree",readonly \
+    "type=bind,\"src=$external_tree\",\"dst=$external_tree\",readonly" \
   skills-reconcile:local list
 ```
 
