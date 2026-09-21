@@ -8,7 +8,7 @@ run = "docker build --target runtime --tag skills-reconcile:local ."
 [tasks."container:test"]
 description = "Build and smoke-test the CLI runtime image"
 run = '''
-set -euo pipefail
+set -eu
 
 docker build --target runtime --tag skills-reconcile:local .
 
