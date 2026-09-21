@@ -4,6 +4,15 @@ set -eu
 
 image='skills-reconcile:local'
 
+escape_csv() {
+  printf '%s' "$1" | LC_ALL=C sed 's/"/""/g'
+}
+
+bind_mount() {
+  printf 'type=bind,"src=%s","dst=%s",readonly' \
+    "$(escape_csv "$1")" "$(escape_csv "$2")"
+}
+
 run_cli() {
   docker run --rm --read-only "$@" \
     --env HOME=/home/skills \
@@ -103,28 +112,26 @@ prepare_group_fixture() {
 test_basic_discovery() (
   assert_output 'container CLI' "$(printf 'alpha\nlinked-skill\nzed\n')" \
     "$@" \
-    --mount \
-      "type=bind,\"src=$smoke_home/.agents\",dst=/home/skills/.agents,readonly" \
-    --mount \
-      "type=bind,\"src=$external_tree\",\"dst=$external_tree\",readonly"
+    --mount "$(bind_mount "$smoke_home/.agents" /home/skills/.agents)" \
+    --mount "$(bind_mount "$external_tree" "$external_tree")"
 )
 
 test_relative_scan_root() (
   assert_output 'relative scan root' 'root-skill' \
     "$@" \
-    --mount \
-      "type=bind,\"src=$smoke_home/relative-root-agents\",dst=/home/skills/.agents,readonly" \
-    --mount \
-      "type=bind,\"src=$smoke_home/relative-root-target\",dst=/home/skills/relative-root-target,readonly"
+    --mount "$(bind_mount \
+      "$smoke_home/relative-root-agents" /home/skills/.agents)" \
+    --mount "$(bind_mount \
+      "$smoke_home/relative-root-target" /home/skills/relative-root-target)"
 )
 
 test_relative_skill_entry() (
   assert_output 'relative Skill entry' 'relative-linked-skill' \
     "$@" \
-    --mount \
-      "type=bind,\"src=$smoke_home/relative-entry-agents\",dst=/home/skills/.agents,readonly" \
-    --mount \
-      "type=bind,\"src=$smoke_home/relative-entry-target\",dst=/home/skills/relative-entry-target,readonly"
+    --mount "$(bind_mount \
+      "$smoke_home/relative-entry-agents" /home/skills/.agents)" \
+    --mount "$(bind_mount \
+      "$smoke_home/relative-entry-target" /home/skills/relative-entry-target)"
 )
 
 test_supplementary_group() (
@@ -141,8 +148,8 @@ test_supplementary_group() (
   assert_output 'supplementary group' 'group-skill' \
     --user "$group_probe_uid:$container_gid" \
     "$@" \
-    --mount \
-      "type=bind,\"src=$smoke_home/group-agents\",dst=/home/skills/.agents,readonly"
+    --mount "$(bind_mount \
+      "$smoke_home/group-agents" /home/skills/.agents)"
 )
 
 test_external_ancestor_permissions() (
@@ -152,17 +159,17 @@ test_external_ancestor_permissions() (
 
   assert_failure 'external ancestor' "$smoke_home/ancestor-stderr" \
     "$@" \
-    --mount \
-      "type=bind,\"src=$smoke_home/ancestor-agents\",dst=/home/skills/.agents,readonly" \
-    --mount \
-      "type=bind,\"src=$smoke_home/external-tree\",\"dst=$smoke_home/external-tree\",readonly"
+    --mount "$(bind_mount \
+      "$smoke_home/ancestor-agents" /home/skills/.agents)" \
+    --mount "$(bind_mount \
+      "$smoke_home/external-tree" "$smoke_home/external-tree")"
 )
 
 test_missing_scan_root() (
   assert_failure 'missing scan root' "$smoke_home/missing-stderr" \
     "$@" \
-    --mount \
-      "type=bind,\"src=$smoke_home/missing-agents\",dst=/home/skills/.agents,readonly"
+    --mount "$(bind_mount \
+      "$smoke_home/missing-agents" /home/skills/.agents)"
 )
 
 test_unreadable_skill() (
@@ -172,15 +179,15 @@ test_unreadable_skill() (
 
   assert_failure 'unreadable Skill' "$smoke_home/unreadable-stderr" \
     "$@" \
-    --mount \
-      "type=bind,\"src=$smoke_home/unreadable-agents\",dst=/home/skills/.agents,readonly"
+    --mount "$(bind_mount \
+      "$smoke_home/unreadable-agents" /home/skills/.agents)"
 )
 
 docker build --target runtime --tag "$image" .
 
 test_root="$(mktemp -d)"
-smoke_home="$test_root/home,fixture"
-external_tree="$test_root/external,tree"
+smoke_home="$test_root/home,\"fixture"
+external_tree="$test_root/external,\"tree"
 external_skill="$external_tree/external-skill"
 container_uid="$(id -u)"
 container_gid="$(id -g)"

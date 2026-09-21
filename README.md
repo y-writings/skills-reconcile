@@ -61,7 +61,22 @@ filesystem and bind mount preserve the CLI's no-write boundary. For a non-root
 user on a rootful Docker daemon, pass the invoking user's numeric UID, primary
 GID, and supplementary GIDs. This prevents default-root DAC bypass while
 preserving access through supplementary groups. User-namespace mappings remain
-daemon-specific:
+daemon-specific. The examples use POSIX shell helpers to quote Docker's
+CSV-style `--mount` fields. This preserves commas and literal double quotes in
+paths:
+
+```sh
+escape_csv() {
+  printf '%s' "$1" | LC_ALL=C sed 's/"/""/g'
+}
+
+bind_mount() {
+  printf 'type=bind,"src=%s","dst=%s",readonly' \
+    "$(escape_csv "$1")" "$(escape_csv "$2")"
+}
+```
+
+Set up the invoking user and the `.agents` mount:
 
 ```sh
 primary_gid="$(id -g)"
@@ -78,13 +93,9 @@ if ! test -d "$agents_dir"; then
 fi
 docker run --rm --read-only "$@" \
   --env HOME=/home/skills \
-  --mount \
-    "type=bind,\"src=$agents_dir\",dst=/home/skills/.agents,readonly" \
+  --mount "$(bind_mount "$agents_dir" /home/skills/.agents)" \
   skills-reconcile:local list
 ```
-
-The inner quotes use Docker's CSV-style `--mount` syntax so a comma in the
-host path remains part of `src` instead of becoming an option separator.
 
 This minimal mount covers directories and relative symlinks whose targets
 resolve inside the mounted `.agents` directory. Absolute symlinks and symlinks
@@ -93,28 +104,15 @@ maps a containing tree to its resolved location inside the container. Mount a
 containing tree rather than only the target directory so the container sees the
 target's host-side ancestor permissions. For an absolute symlink, the host
 source and container destination are the same. For example, for
-`/absolute/path/to/external-skill`, mount `/absolute` at `/absolute`:
+`/absolute/path/to/external-skill`, continue from the setup above and mount
+`/absolute` at `/absolute`:
 
 ```sh
-primary_gid="$(id -g)"
-set -- --user "$(id -u):$primary_gid"
-for group_id in $(id -G); do
-  if test "$group_id" -ne "$primary_gid"; then
-    set -- "$@" --group-add "$group_id"
-  fi
-done
-agents_dir="$HOME/.agents"
-if ! test -d "$agents_dir"; then
-  agents_dir="$(mktemp -d)"
-  trap 'rmdir "$agents_dir"' EXIT
-fi
 external_tree="/absolute"
 docker run --rm --read-only "$@" \
   --env HOME=/home/skills \
-  --mount \
-    "type=bind,\"src=$agents_dir\",dst=/home/skills/.agents,readonly" \
-  --mount \
-    "type=bind,\"src=$external_tree\",\"dst=$external_tree\",readonly" \
+  --mount "$(bind_mount "$agents_dir" /home/skills/.agents)" \
+  --mount "$(bind_mount "$external_tree" "$external_tree")" \
   skills-reconcile:local list
 ```
 
