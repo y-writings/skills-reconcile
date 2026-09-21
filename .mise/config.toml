@@ -13,16 +13,21 @@ set -eu
 docker build --target runtime --tag skills-reconcile:local .
 
 smoke_home="$(mktemp -d)"
-trap 'chmod -R u+w "$smoke_home"; rm -rf "$smoke_home"' EXIT
+external_skill="$(mktemp -d)"
+trap 'chmod -R u+w "$smoke_home" "$external_skill"; rm -rf "$smoke_home" "$external_skill"' EXIT
 mkdir -p "$smoke_home/.agents/skills/alpha" "$smoke_home/.agents/skills/zed"
 touch "$smoke_home/.agents/skills/alpha/SKILL.md"
 touch "$smoke_home/.agents/skills/zed/SKILL.md"
+touch "$external_skill/SKILL.md"
+ln -s "$external_skill" "$smoke_home/.agents/skills/linked-skill"
 
-expected="$(printf 'alpha\nzed\n')"
+expected="$(printf 'alpha\nlinked-skill\nzed\n')"
 actual="$(docker run --rm --read-only \
   --env HOME=/home/skills \
   --mount \
     "type=bind,src=$smoke_home/.agents/skills,dst=/home/skills/.agents/skills,readonly" \
+  --mount \
+    "type=bind,src=$external_skill,dst=$external_skill,readonly" \
   skills-reconcile:local list)"
 if test "$actual" != "$expected"; then
   printf 'unexpected container CLI output: %s\n' "$actual" >&2

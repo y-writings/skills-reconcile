@@ -54,8 +54,8 @@ Build the runtime image:
 docker build --target runtime --tag skills-reconcile:local .
 ```
 
-Mount only the Skill directory into a synthetic home. The read-only container
-filesystem and read-only bind mount preserve the CLI's no-write boundary:
+Mount the Skill directory into a synthetic home. The read-only container
+filesystem and bind mount preserve the CLI's no-write boundary:
 
 ```sh
 skills_dir="$HOME/.agents/skills"
@@ -65,6 +65,28 @@ docker run --rm --read-only \
     type=bind,src="$skills_dir",dst=/home/skills/.agents/skills,readonly \
   skills-reconcile:local list
 ```
+
+This minimal mount covers directories and relative symlinks whose targets
+resolve inside the mounted Skill directory. Absolute symlinks and symlinks to
+directories outside `.agents/skills` require an additional read-only mount at
+the path where each target resolves inside the container. For an absolute
+symlink, mount the target at the same absolute path:
+
+```sh
+skills_dir="$HOME/.agents/skills"
+external_skill="/absolute/path/to/external-skill"
+docker run --rm --read-only \
+  --env HOME=/home/skills \
+  --mount \
+    type=bind,src="$skills_dir",dst=/home/skills/.agents/skills,readonly \
+  --mount \
+    type=bind,src="$external_skill",dst="$external_skill",readonly \
+  skills-reconcile:local list
+```
+
+Repeat the additional mount for every external target. For a relative symlink,
+set `dst` to the path where the link resolves from
+`/home/skills/.agents/skills`.
 
 The command exits with status `0` on success. Invalid arguments, an invalid
 `HOME`, an unavailable scan root, or an unreadable recognized entry produce a
