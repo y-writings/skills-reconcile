@@ -18,11 +18,15 @@ trap 'chmod -R u+w "$smoke_home" "$external_skill"; rm -rf "$smoke_home" "$exter
 mkdir -p \
   "$smoke_home/.agents/skills/alpha" \
   "$smoke_home/.agents/skills/zed" \
+  "$smoke_home/relative-root-agents" \
+  "$smoke_home/relative-root-target/root-skill" \
   "$smoke_home/missing-agents"
 touch "$smoke_home/.agents/skills/alpha/SKILL.md"
 touch "$smoke_home/.agents/skills/zed/SKILL.md"
 touch "$external_skill/SKILL.md"
+touch "$smoke_home/relative-root-target/root-skill/SKILL.md"
 ln -s "$external_skill" "$smoke_home/.agents/skills/linked-skill"
+ln -s '../relative-root-target' "$smoke_home/relative-root-agents/skills"
 
 expected="$(printf 'alpha\nlinked-skill\nzed\n')"
 actual="$(docker run --rm --read-only \
@@ -34,6 +38,19 @@ actual="$(docker run --rm --read-only \
   skills-reconcile:local list)"
 if test "$actual" != "$expected"; then
   printf 'unexpected container CLI output: %s\n' "$actual" >&2
+  exit 1
+fi
+
+relative_root_actual="$(docker run --rm --read-only \
+  --env HOME=/home/skills \
+  --mount \
+    "type=bind,src=$smoke_home/relative-root-agents,dst=/home/skills/.agents,readonly" \
+  --mount \
+    "type=bind,src=$smoke_home/relative-root-target,dst=/home/skills/relative-root-target,readonly" \
+  skills-reconcile:local list)"
+if test "$relative_root_actual" != 'root-skill'; then
+  printf 'unexpected relative scan root output: %s\n' \
+    "$relative_root_actual" >&2
   exit 1
 fi
 

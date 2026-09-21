@@ -94,8 +94,10 @@ docker run --rm --read-only \
   skills-reconcile:local list
 ```
 
-Repeat the additional mount for every external target. For a relative symlink,
-set `dst` to the path where the link resolves from
+Repeat the additional mount for every external target. Set `dst` to the target
+path after resolving a relative symlink from its actual parent in the
+container. Resolve the scan-root link `.agents/skills` from
+`/home/skills/.agents`; resolve a Skill entry inside that root from
 `/home/skills/.agents/skills`.
 
 The command exits with status `0` on success. Invalid arguments, an invalid
