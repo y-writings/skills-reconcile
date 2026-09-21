@@ -58,18 +58,25 @@ Mount the `.agents` parent into a synthetic home. If the host parent is absent,
 use an empty temporary directory so the CLI can report the missing scan root
 instead of Docker rejecting a nonexistent bind source. The read-only container
 filesystem and bind mount preserve the CLI's no-write boundary. For a non-root
-user on a rootful Docker daemon, pass the invoking user's numeric UID and
-primary GID so the CLI does not default to root and bypass DAC checks.
-Supplementary groups and user-namespace mappings remain daemon-specific:
+user on a rootful Docker daemon, pass the invoking user's numeric UID, primary
+GID, and supplementary GIDs. This prevents default-root DAC bypass while
+preserving access through supplementary groups. User-namespace mappings remain
+daemon-specific:
 
 ```sh
+primary_gid="$(id -g)"
+set -- --user "$(id -u):$primary_gid"
+for group_id in $(id -G); do
+  if test "$group_id" -ne "$primary_gid"; then
+    set -- "$@" --group-add "$group_id"
+  fi
+done
 agents_dir="$HOME/.agents"
 if ! test -d "$agents_dir"; then
   agents_dir="$(mktemp -d)"
   trap 'rmdir "$agents_dir"' EXIT
 fi
-docker run --rm --read-only \
-  --user "$(id -u):$(id -g)" \
+docker run --rm --read-only "$@" \
   --env HOME=/home/skills \
   --mount \
     type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
@@ -83,14 +90,20 @@ path where each target resolves inside the container. For an absolute symlink,
 mount the target at the same absolute path:
 
 ```sh
+primary_gid="$(id -g)"
+set -- --user "$(id -u):$primary_gid"
+for group_id in $(id -G); do
+  if test "$group_id" -ne "$primary_gid"; then
+    set -- "$@" --group-add "$group_id"
+  fi
+done
 agents_dir="$HOME/.agents"
 if ! test -d "$agents_dir"; then
   agents_dir="$(mktemp -d)"
   trap 'rmdir "$agents_dir"' EXIT
 fi
 external_skill="/absolute/path/to/external-skill"
-docker run --rm --read-only \
-  --user "$(id -u):$(id -g)" \
+docker run --rm --read-only "$@" \
   --env HOME=/home/skills \
   --mount \
     type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
