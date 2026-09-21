@@ -54,31 +54,41 @@ Build the runtime image:
 docker build --target runtime --tag skills-reconcile:local .
 ```
 
-Mount the Skill directory into a synthetic home. The read-only container
+Mount the `.agents` parent into a synthetic home. If the host parent is absent,
+use an empty temporary directory so the CLI can report the missing scan root
+instead of Docker rejecting a nonexistent bind source. The read-only container
 filesystem and bind mount preserve the CLI's no-write boundary:
 
 ```sh
-skills_dir="$HOME/.agents/skills"
+agents_dir="$HOME/.agents"
+if ! test -d "$agents_dir"; then
+  agents_dir="$(mktemp -d)"
+  trap 'rmdir "$agents_dir"' EXIT
+fi
 docker run --rm --read-only \
   --env HOME=/home/skills \
   --mount \
-    type=bind,src="$skills_dir",dst=/home/skills/.agents/skills,readonly \
+    type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
   skills-reconcile:local list
 ```
 
 This minimal mount covers directories and relative symlinks whose targets
-resolve inside the mounted Skill directory. Absolute symlinks and symlinks to
-directories outside `.agents/skills` require an additional read-only mount at
-the path where each target resolves inside the container. For an absolute
-symlink, mount the target at the same absolute path:
+resolve inside the mounted `.agents` directory. Absolute symlinks and symlinks
+to directories outside `.agents` require an additional read-only mount at the
+path where each target resolves inside the container. For an absolute symlink,
+mount the target at the same absolute path:
 
 ```sh
-skills_dir="$HOME/.agents/skills"
+agents_dir="$HOME/.agents"
+if ! test -d "$agents_dir"; then
+  agents_dir="$(mktemp -d)"
+  trap 'rmdir "$agents_dir"' EXIT
+fi
 external_skill="/absolute/path/to/external-skill"
 docker run --rm --read-only \
   --env HOME=/home/skills \
   --mount \
-    type=bind,src="$skills_dir",dst=/home/skills/.agents/skills,readonly \
+    type=bind,src="$agents_dir",dst=/home/skills/.agents,readonly \
   --mount \
     type=bind,src="$external_skill",dst="$external_skill",readonly \
   skills-reconcile:local list
