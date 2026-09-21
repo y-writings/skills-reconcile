@@ -2,9 +2,9 @@
 # Add project-specific information here.
 
 [tasks."container:build"]
-description = "Build the pinned development toolchain image"
-run = "docker build --target development --tag skills-reconcile-dev:local ."
+description = "Build the CLI runtime image"
+run = "docker build --target runtime --tag skills-reconcile:local ."
 
 [tasks."container:test"]
-description = "Build and test in the pinned toolchain image"
-run = "docker build --target test --tag skills-reconcile-test:local ."
+description = "Build and smoke-test the CLI runtime image"
+file = "scripts/container-test.sh"
