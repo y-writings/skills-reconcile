@@ -19,9 +19,11 @@ RUN unformatted="$(gofmt -l .)" \
     && test -z "$unformatted"
 RUN go test ./... \
     && go vet ./... \
-    && go build -trimpath -o /usr/local/bin/skills-reconcile ./cmd/skills-reconcile \
-    && skills-reconcile --help >/dev/null
+    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
+        -o /usr/local/bin/skills-reconcile ./cmd/skills-reconcile
 
-FROM toolchain AS development
+FROM scratch AS runtime
 
-CMD ["bash"]
+COPY --from=test /usr/local/bin/skills-reconcile /usr/local/bin/skills-reconcile
+
+ENTRYPOINT ["/usr/local/bin/skills-reconcile"]

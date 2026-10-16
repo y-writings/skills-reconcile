@@ -54,7 +54,21 @@
             installCheckPhase = ''
               runHook preInstallCheck
 
-              $out/bin/skills-reconcile --help >/dev/null
+              smoke_home="$(mktemp -d)"
+              mkdir -p \
+                "$smoke_home/.agents/skills/alpha" \
+                "$smoke_home/.agents/skills/zed"
+              touch \
+                "$smoke_home/.agents/skills/alpha/SKILL.md" \
+                "$smoke_home/.agents/skills/zed/SKILL.md"
+              chmod -R a-w "$smoke_home"
+
+              expected="$(printf 'alpha\nzed\n')"
+              actual="$(HOME="$smoke_home" $out/bin/skills-reconcile list)"
+              if test "$actual" != "$expected"; then
+                echo "unexpected installed CLI output: $actual" >&2
+                exit 1
+              fi
 
               runHook postInstallCheck
             '';
